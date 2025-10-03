@@ -25,29 +25,114 @@ from jinja2 import Environment, FileSystemLoader
 from numpy import base_repr
 
 
-with open("vars/generic.yml") as genfile:
-    generic = yaml.safe_load(genfile)
+# Custom exception classes for better error handling
+class AutoNetError(Exception):
+    """Base exception for AutoNet errors"""
+
+    pass
 
 
-def download(url, headers={}):
+class PeeringDBError(AutoNetError):
+    """PeeringDB API related errors"""
+
+    pass
+
+
+class ConfigurationError(AutoNetError):
+    """Configuration file related errors"""
+
+    pass
+
+
+class FileOperationError(AutoNetError):
+    """File operation related errors"""
+
+    pass
+
+
+# Load generic configuration with proper error handling
+try:
+    with open("vars/generic.yml", "r", encoding="utf-8") as genfile:
+        generic = yaml.safe_load(genfile)
+        if generic is None:
+            raise ConfigurationError("vars/generic.yml is empty or invalid")
+except FileNotFoundError:
+    print("ERROR: Configuration file vars/generic.yml not found", file=sys.stderr)
+    raise ConfigurationError("Configuration file vars/generic.yml not found")
+except yaml.YAMLError as e:
+    print(f"ERROR: Invalid YAML in vars/generic.yml: {e}", file=sys.stderr)
+    raise ConfigurationError(f"Invalid YAML in vars/generic.yml: {e}")
+except PermissionError:
+    print("ERROR: Permission denied reading vars/generic.yml", file=sys.stderr)
+    raise ConfigurationError("Permission denied reading vars/generic.yml")
+except UnicodeDecodeError as e:
+    print(f"ERROR: Unicode decode error in vars/generic.yml: {e}", file=sys.stderr)
+    raise ConfigurationError(f"Unicode decode error in vars/generic.yml: {e}")
+
+
+def download(url, headers={}, timeout=30, max_retries=3):
+    """Download content from URL with proper error handling and retries"""
     headers["user-agent"] = "autonet"
-    try:
-        r = requests.get(url, headers=headers)
-        downloaded_file = r.text
-    except requests.exceptions.RequestException:
-        print("Downloading %s failed" % url, file=sys.stderr)
-        sys.exit(2)
 
-    return downloaded_file
+    for attempt in range(max_retries):
+        try:
+            r = requests.get(url, headers=headers, timeout=timeout)
+            r.raise_for_status()  # Raises HTTPError for bad responses
+            return r.text
+        except requests.exceptions.Timeout:
+            print(
+                f"Timeout downloading {url} (attempt {attempt + 1}/{max_retries})",
+                file=sys.stderr,
+            )
+            if attempt == max_retries - 1:
+                raise PeeringDBError(
+                    f"Timeout downloading {url} after {max_retries} attempts"
+                )
+        except requests.exceptions.ConnectionError as e:
+            print(
+                f"Connection error downloading {url} (attempt {attempt + 1}/{max_retries}): {e}",
+                file=sys.stderr,
+            )
+            if attempt == max_retries - 1:
+                raise PeeringDBError(f"Connection error downloading {url}: {e}")
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP error downloading {url}: {e}", file=sys.stderr)
+            raise PeeringDBError(f"HTTP error downloading {url}: {e}")
+        except requests.exceptions.RequestException as e:
+            print(
+                f"Request error downloading {url} (attempt {attempt + 1}/{max_retries}): {e}",
+                file=sys.stderr,
+            )
+            if attempt == max_retries - 1:
+                raise PeeringDBError(f"Request error downloading {url}: {e}")
+
+        # Wait before retrying (exponential backoff)
+        if attempt < max_retries - 1:
+            wait_time = 2**attempt
+            print(f"Waiting {wait_time} seconds before retry...", file=sys.stderr)
+            time.sleep(wait_time)
 
 
 def readfile(filename):
+    """Read file content with proper error handling"""
     try:
-        with open(filename, "r") as reader:
+        with open(filename, "r", encoding="utf-8") as reader:
             filecontent = reader.read()
-    except:
-        print("Reading %s failed" % filename, file=sys.stderr)
-        sys.exit(2)
+    except FileNotFoundError:
+        print(f"File not found: {filename}", file=sys.stderr)
+        raise FileOperationError(f"File not found: {filename}")
+    except PermissionError:
+        print(f"Permission denied reading file: {filename}", file=sys.stderr)
+        raise FileOperationError(f"Permission denied reading file: {filename}")
+    except UnicodeDecodeError as e:
+        print(f"Unicode decode error reading file {filename}: {e}", file=sys.stderr)
+        raise FileOperationError(f"Unicode decode error reading file {filename}: {e}")
+    except IOError as e:
+        print(f"IO error reading file {filename}: {e}", file=sys.stderr)
+        raise FileOperationError(f"IO error reading file {filename}: {e}")
+    except Exception as e:
+        print(f"Unexpected error reading file {filename}: {e}", file=sys.stderr)
+        raise FileOperationError(f"Unexpected error reading file {filename}: {e}")
 
     return filecontent
 
@@ -121,7 +206,14 @@ if "PEERINGS_FILE" in os.environ:
 else:
     peerings_flat = download(generic["peerings_url"])
 
-peerings = yaml.safe_load(peerings_flat)
+# Parse peerings configuration with error handling
+try:
+    peerings = yaml.safe_load(peerings_flat)
+    if peerings is None:
+        raise ConfigurationError("Peerings configuration is empty or invalid")
+except yaml.YAMLError as e:
+    print(f"ERROR: Invalid YAML in peerings configuration: {e}", file=sys.stderr)
+    raise ConfigurationError(f"Invalid YAML in peerings configuration: {e}")
 
 # ip addresses should not be needed to define ourselves
 #   this could be retrieved from https://www.peeringdb.com/api/ixlan
