@@ -14,7 +14,7 @@ AutoNet is a production-ready network automation toolchain for generating BIRD r
 
 ### New Architecture Components
 - **🔧 Configuration Management**: Schema-validated YAML with environment overrides
-- **🔌 Plugin System**: Extensible vendor support (BIRD, BIRD2, FRR, etc.)
+- **🔌 Plugin System**: Extensible vendor support (BIRD, BIRD2, Cisco IOS/XR, FRR, etc.)
 - **📊 State Management**: Database-backed event tracking and performance monitoring
 - **🛡️ Enterprise Security**: Encrypted API keys, input validation, secure operations
 
@@ -104,7 +104,7 @@ AutoNet v2.0 uses a modern three-tier architecture:
 - **Hierarchical Config**: Base + router-specific configuration inheritance
 
 #### 2. Plugin System (`lib/plugin_system.py`)
-- **Vendor Plugins**: Support for BIRD, BIRD2, FRR, Cisco, Juniper
+- **Vendor Plugins**: Support for BIRD, BIRD2, **Cisco IOS/XR** ✅, FRR, Juniper
 - **Filter Plugins**: Custom prefix filtering implementations
 - **Auto-Discovery**: Automatic plugin loading from configured directories
 - **Lifecycle Management**: Plugin initialization, cleanup, and dependency resolution
@@ -162,12 +162,19 @@ bgp:
     ipv4: 192.0.2.1
     ipv6: 2001:db8::1
     vendor: bird
-
+  
   router2:
     fqdn: router2.example.net
     ipv4: 192.0.2.2
     ipv6: 2001:db8::2
     vendor: bird2  # 🆕 Multi-vendor support
+  
+  cisco-router:
+    fqdn: cisco1.example.net
+    ipv4: 192.0.2.10
+    ipv6: 2001:db8::10
+    vendor: cisco  # 🆕 Cisco IOS/XR support
+    platform: ios  # or iosxr
 
 # IXP definitions
 ixp_map:
@@ -238,7 +245,10 @@ export SSH_TIMEOUT="30"
 # Generate peer config with new tool
 ./autonet.py peer-config --asn AS64512 --vendor bird2 --output peer.conf
 
-# List available vendor plugins
+# Generate Cisco configuration
+./autonet.py peer-config --asn AS64512 --vendor cisco --output cisco-peer.conf
+
+# List available vendor plugins (now includes Cisco)
 ./autonet.py peer-config --list-vendors
 
 # Generate from JSON file

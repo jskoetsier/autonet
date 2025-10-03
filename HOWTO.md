@@ -40,10 +40,11 @@ export AUTONET_PEERINGDB_KEY="your-api-key"
 ./autonet.py deploy status   # Check router status
 ```
 
-### Peer Configuration (New)
+### Peer Configuration Generation (New)
 ```bash
 ./autonet.py peer-config --asn AS64512 --vendor bird2
-./autonet.py peer-config --list-vendors
+./autonet.py peer-config --asn AS64512 --vendor cisco  # Cisco IOS/XR support
+./autonet.py peer-config --list-vendors                # Shows BIRD, BIRD2, Cisco
 ```
 
 ### Monitoring & Analytics (New)
