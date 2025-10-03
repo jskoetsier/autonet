@@ -78,10 +78,22 @@ class ValidationError(AutoNetError):
 
 # Security and validation functions
 def validate_asn(asn: str) -> bool:
-    """Validate ASN format (ASxxxxx)"""
+    """Validate ASN format supporting 32-bit ASNs (ASxxxxx)"""
     if not isinstance(asn, str):
         return False
-    return re.match(r'^AS\d+$', asn, re.IGNORECASE) is not None
+    
+    if not re.match(r'^AS\d+$', asn, re.IGNORECASE):
+        return False
+    
+    # Extract ASN number and validate 32-bit range
+    try:
+        asn_num = int(asn[2:])
+        # Valid 32-bit ASN range: 1-4294967294 (excluding reserved values)
+        if asn_num == 0 or asn_num == 23456 or asn_num == 4294967295:
+            return False
+        return 1 <= asn_num <= 4294967294
+    except ValueError:
+        return False
 
 
 def validate_ip_address(ip: str) -> bool:

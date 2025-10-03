@@ -162,13 +162,13 @@ bgp:
     ipv4: 192.0.2.1
     ipv6: 2001:db8::1
     vendor: bird
-  
+
   router2:
     fqdn: router2.example.net
     ipv4: 192.0.2.2
     ipv6: 2001:db8::2
     vendor: bird2  # 🆕 Multi-vendor support
-  
+
   cisco-router:
     fqdn: cisco1.example.net
     ipv4: 192.0.2.10

@@ -51,7 +51,7 @@ bgp:
     ipv6: 2001:db8::1
     vendor: cisco
     platform: ios        # Cisco IOS
-    
+
   cisco-xr-router:
     fqdn: r2.example.net
     ipv4: 192.0.2.2
@@ -89,7 +89,7 @@ router bgp 64500
  address-family ipv6
   neighbor 2001:db8::100 remote-as 64512
   neighbor 2001:db8::100 description Example Peer
-  neighbor 2001:db8::100 route-map RM-AS64512-IN in  
+  neighbor 2001:db8::100 route-map RM-AS64512-IN in
   neighbor 2001:db8::100 route-map RM-AS64512-OUT out
   neighbor 2001:db8::100 maximum-prefix 100
   neighbor 2001:db8::100 activate
@@ -241,7 +241,7 @@ The plugin uses built-in Jinja2 templates:
 ```
 cisco_plugin.templates:
 ├── ios_peer.j2          # Standard IOS peer
-├── ios_transit.j2       # IOS transit provider  
+├── ios_transit.j2       # IOS transit provider
 ├── ios_route_server.j2  # IOS route server
 ├── iosxr_peer.j2        # Standard IOS-XR peer
 ├── iosxr_transit.j2     # IOS-XR transit provider
@@ -387,6 +387,6 @@ Custom templates should follow the naming convention:
 
 ---
 
-**Status**: ✅ **Production Ready**  
-**Maintained by**: AutoNet Community  
+**Status**: ✅ **Production Ready**
+**Maintained by**: AutoNet Community
 **Last Updated**: October 2024

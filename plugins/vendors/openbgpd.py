@@ -9,34 +9,36 @@ This is a placeholder implementation ready for community contribution.
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 # Import plugin system
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from lib.plugin_system import VendorPlugin, PluginInfo, PluginType
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+from lib.plugin_system import PluginInfo, PluginType, VendorPlugin
 
 
 class OpenBGPDVendorPlugin(VendorPlugin):
     """
     OpenBGPD vendor plugin implementation
-    
+
     Status: 🔮 PLACEHOLDER - Ready for community implementation
-    
+
     Features to implement:
     - OpenBGPD configuration generation
     - bgpctl command integration
     - Template support for OpenBGPD syntax
     - Configuration validation via bgpd -n
     """
-    
+
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
-        
+
         # Configuration with defaults
-        self.bgpd_bin = self.config.get('bgpd_bin', '/usr/sbin/bgpd')
-        self.bgpctl_bin = self.config.get('bgpctl_bin', '/usr/sbin/bgpctl')
-        self.template_dir = self.config.get('template_dir', 'templates/openbgpd')
-        
+        self.bgpd_bin = self.config.get("bgpd_bin", "/usr/sbin/bgpd")
+        self.bgpctl_bin = self.config.get("bgpctl_bin", "/usr/sbin/bgpctl")
+        self.template_dir = self.config.get("template_dir", "templates/openbgpd")
+
         # OpenBGPD capabilities (to be implemented)
         self.capabilities = [
             "bgp_communities",
@@ -44,9 +46,9 @@ class OpenBGPDVendorPlugin(VendorPlugin):
             "as_path_filters",
             "roa_sets",
             "flowspec",
-            "route_collectors"
+            "route_collectors",
         ]
-    
+
     def get_info(self) -> PluginInfo:
         """Return plugin information"""
         return PluginInfo(
@@ -59,27 +61,31 @@ class OpenBGPDVendorPlugin(VendorPlugin):
             config=self.config,
             module_path="plugins.vendors.openbgpd",
             class_name="OpenBGPDVendorPlugin",
-            dependencies=[]
+            dependencies=[],
         )
-    
+
     def initialize(self) -> bool:
         """Initialize the OpenBGPD plugin"""
         # TODO: Community implementation needed
-        self.logger.info("OpenBGPD plugin is a placeholder - community implementation needed")
+        self.logger.info(
+            "OpenBGPD plugin is a placeholder - community implementation needed"
+        )
         return False  # Not ready for use
-    
+
     def cleanup(self) -> bool:
         """Cleanup plugin resources"""
         return True
-    
-    def generate_config(self, peer_info: Dict[str, Any], template_vars: Dict[str, Any]) -> str:
+
+    def generate_config(
+        self, peer_info: Dict[str, Any], template_vars: Dict[str, Any]
+    ) -> str:
         """
         Generate OpenBGPD configuration
-        
+
         TODO: Community implementation needed
         """
         # Placeholder implementation
-        asn = peer_info.get('asn', 'unknown')
+        asn = peer_info.get("asn", "unknown")
         return f"""# OpenBGPD Configuration for {asn}
 # TODO: Community implementation needed
 #
@@ -108,17 +114,17 @@ prefix-set "PEER-{asn}-OUT" {{
     # TODO: Implement prefix filtering
 }}
 """
-    
+
     def validate_config(self, config_content: str) -> bool:
         """
         Validate OpenBGPD configuration
-        
+
         TODO: Community implementation needed
         """
         # Placeholder - always returns False until implemented
         self.logger.warning("OpenBGPD configuration validation not implemented")
         return False
-    
+
     def get_supported_features(self) -> List[str]:
         """Return list of supported OpenBGPD features"""
         return self.capabilities.copy()

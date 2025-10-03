@@ -3,7 +3,7 @@
 ## What's New in v2.0
 
 - **🐍 Pure Python**: All bash scripts replaced with modern Python
-- **🔧 Unified CLI**: Single `autonet.py` command for all operations  
+- **🔧 Unified CLI**: Single `autonet.py` command for all operations
 - **📊 99.8% Memory Reduction**: Streaming architecture (8KB vs 500MB+)
 - **🛡️ Enterprise Security**: Encrypted API keys, input validation
 - **🔌 Plugin Architecture**: Multi-vendor support (BIRD, BIRD2, FRR)
@@ -50,7 +50,7 @@ export AUTONET_PEERINGDB_KEY="your-api-key"
 ### Monitoring & Analytics (New)
 ```bash
 ./autonet.py state events --limit 50      # Recent events
-./autonet.py state stats --days 7         # Performance stats  
+./autonet.py state stats --days 7         # Performance stats
 ./autonet.py state cleanup                # Clean old data
 ```
 
@@ -86,7 +86,7 @@ bgp:
     ipv4: 192.0.2.1
     ipv6: 2001:db8::1
     vendor: bird      # Multi-vendor support
-    
+
   "dc5-2":
     fqdn: dc5-2.router.nl.example.net
     ipv4: 192.0.2.2
@@ -178,7 +178,7 @@ from lib.plugin_system import VendorPlugin, PluginInfo, PluginType
 class CustomVendorPlugin(VendorPlugin):
     def get_info(self):
         return PluginInfo(name="custom", ...)
-    
+
     def generate_config(self, peer_info, template_vars):
         return "# Custom config"
 ```
