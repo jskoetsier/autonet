@@ -13,3 +13,6 @@ yamllint>=1.26.0,<2.0.0  # https://pypi.org/project/yamllint/
 # Additional recommended packages for improved development
 black>=22.0.0,<24.0.0  # Code formatter
 ruff>=0.1.0,<1.0.0  # Fast Python linter
+
+# Security and cryptography
+cryptography>=41.0.0,<42.0.0  # For API key encryption

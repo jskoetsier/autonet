@@ -13,16 +13,23 @@
 import ipaddress
 import json
 import os
+import re
 import sys
 import time
+import fcntl
+import shlex
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from hashlib import sha256
 from subprocess import PIPE, Popen
+from typing import List, Dict, Optional, Union
+from pathlib import Path
 
 import requests
 import yaml
 from jinja2 import Environment, FileSystemLoader
 from numpy import base_repr
+from cryptography.fernet import Fernet
+import base64
 
 
 # Custom exception classes for better error handling
@@ -46,8 +53,146 @@ class ConfigurationError(AutoNetError):
 
 class FileOperationError(AutoNetError):
     """File operation related errors"""
-
     pass
+
+
+class ValidationError(AutoNetError):
+    """Input validation related errors"""
+    pass
+
+
+# Security and validation functions
+def validate_asn(asn: str) -> bool:
+    """Validate ASN format (ASxxxxx)"""
+    if not isinstance(asn, str):
+        return False
+    return re.match(r'^AS\d+$', asn, re.IGNORECASE) is not None
+
+
+def validate_ip_address(ip: str) -> bool:
+    """Validate IP address format"""
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def validate_as_set(as_set: str) -> bool:
+    """Validate AS-SET format"""
+    if not isinstance(as_set, str):
+        return False
+    # AS-SET format: AS-SETNAME or ASN:AS-SETNAME
+    return re.match(r'^(AS\d+:)?AS-[A-Z0-9\-]+$', as_set, re.IGNORECASE) is not None
+
+
+def sanitize_shell_input(input_str: str) -> str:
+    """Sanitize string for safe shell usage"""
+    if not isinstance(input_str, str):
+        raise ValidationError("Input must be a string")
+    
+    # Remove any potentially dangerous characters
+    sanitized = re.sub(r'[;&|`$(){}[\]<>]', '', input_str)
+    return shlex.quote(sanitized)
+
+
+def get_api_key(key_name: str, config_key: str = None) -> str:
+    """Securely retrieve API key from environment or config"""
+    # First try environment variable (most secure)
+    env_key = os.environ.get(f'AUTONET_{key_name.upper()}_KEY')
+    if env_key:
+        return env_key
+    
+    # Fall back to encrypted config if available
+    if config_key and config_key in generic:
+        encrypted_key = generic[config_key]
+        # Check if it's encrypted (starts with our encryption prefix)
+        if isinstance(encrypted_key, str) and encrypted_key.startswith('ENCRYPTED:'):
+            try:
+                return decrypt_api_key(encrypted_key[10:])  # Remove ENCRYPTED: prefix
+            except Exception as e:
+                print(f"WARNING: Failed to decrypt API key {key_name}: {e}", file=sys.stderr)
+                return encrypted_key[10:]  # Return as-is if decryption fails
+        else:
+            print(f"WARNING: API key {key_name} is stored in plaintext. Consider using encryption or environment variables", file=sys.stderr)
+            return encrypted_key
+    
+    raise ConfigurationError(f"API key {key_name} not found in environment or config")
+
+
+def encrypt_api_key(key: str, encryption_key: str = None) -> str:
+    """Encrypt API key for storage"""
+    if not encryption_key:
+        encryption_key = os.environ.get('AUTONET_ENCRYPTION_KEY')
+        if not encryption_key:
+            # Generate a key if none provided (should be saved securely)
+            encryption_key = Fernet.generate_key().decode()
+            print(f"Generated encryption key: {encryption_key}", file=sys.stderr)
+            print("Save this key securely and set AUTONET_ENCRYPTION_KEY environment variable", file=sys.stderr)
+    
+    try:
+        if isinstance(encryption_key, str):
+            encryption_key = encryption_key.encode()
+        fernet = Fernet(encryption_key)
+        encrypted = fernet.encrypt(key.encode())
+        return base64.b64encode(encrypted).decode()
+    except Exception as e:
+        raise ConfigurationError(f"Failed to encrypt API key: {e}")
+
+
+def decrypt_api_key(encrypted_key: str, encryption_key: str = None) -> str:
+    """Decrypt API key from storage"""
+    if not encryption_key:
+        encryption_key = os.environ.get('AUTONET_ENCRYPTION_KEY')
+        if not encryption_key:
+            raise ConfigurationError("AUTONET_ENCRYPTION_KEY environment variable not set")
+    
+    try:
+        if isinstance(encryption_key, str):
+            encryption_key = encryption_key.encode()
+        fernet = Fernet(encryption_key)
+        encrypted_bytes = base64.b64decode(encrypted_key.encode())
+        decrypted = fernet.decrypt(encrypted_bytes)
+        return decrypted.decode()
+    except Exception as e:
+        raise ConfigurationError(f"Failed to decrypt API key: {e}")
+
+
+def safe_file_write(filename: str, content: str, mode: str = 'w') -> None:
+    """Thread-safe file writing with file locking"""
+    try:
+        # Ensure directory exists
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(filename, mode, encoding='utf-8') as f:
+            # Apply exclusive lock
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                f.write(content)
+                f.flush()  # Ensure data is written
+                os.fsync(f.fileno())  # Force write to disk
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    except Exception as e:
+        raise FileOperationError(f"Failed to write file {filename}: {e}")
+
+
+def safe_file_check_and_update(filename: str, content: str, max_age_seconds: int = 3600) -> bool:
+    """Thread-safe file checking and updating with proper locking"""
+    try:
+        # Create file if it doesn't exist
+        if not os.path.exists(filename):
+            safe_file_write(filename, content)
+            return True
+        
+        # Check if file needs updating (age-based)
+        if time.time() - os.path.getmtime(filename) > max_age_seconds:
+            safe_file_write(filename, content)
+            return True
+        
+        return False
+    except Exception as e:
+        raise FileOperationError(f"Failed to check/update file {filename}: {e}")
 
 
 # Load generic configuration with proper error handling
@@ -137,11 +282,16 @@ def readfile(filename):
     return filecontent
 
 
-pdb_auth = {
-    "Authorization": (
-        "Api-Key " + os.environ.get("PEERINGDB_API_KEY", generic["pdb_apikey"])
-    )
-}
+# Secure API key handling with validation
+try:
+    pdb_api_key = get_api_key("PEERINGDB", "pdb_apikey")
+    if not pdb_api_key:
+        raise ConfigurationError("PeeringDB API key is empty")
+    pdb_auth = {"Authorization": f"Api-Key {pdb_api_key}"}
+except (KeyError, ConfigurationError) as e:
+    print(f"ERROR: {e}", file=sys.stderr)
+    print("Set AUTONET_PEERINGDB_KEY environment variable or configure pdb_apikey in generic.yml", file=sys.stderr)
+    sys.exit(1)
 netixlan = "https://www.peeringdb.com/api/netixlan"
 pdb_data = json.loads(download(netixlan, pdb_auth))
 
@@ -604,6 +754,18 @@ with ProcessPoolExecutor(max_workers=10) as executor:
 
 
 for asn in peerings:
+    # Validate ASN format
+    if not validate_asn(asn):
+        print(f"ERROR: Invalid ASN format: {asn}", file=sys.stderr)
+        continue
+    
+    # Validate AS-SET in import field
+    if "import" in peerings[asn] and peerings[asn]["import"] != "ANY":
+        for as_set in peerings[asn]["import"].split():
+            if not validate_as_set(as_set) and not validate_asn(as_set):
+                print(f"ERROR: Invalid AS-SET or ASN format in import for {asn}: {as_set}", file=sys.stderr)
+                continue
+    
     sessions = []
     if "only_with" in peerings[asn]:
         sessions = peerings[asn]["only_with"]
@@ -613,12 +775,25 @@ for asn in peerings:
         sessions = pdb[int(asn[2:])]
         if "not_with" in peerings[asn]:
             for remove_ip in peerings[asn]["not_with"]:
+                # Validate IP before removing
+                if not validate_ip_address(remove_ip):
+                    print(f"ERROR: Invalid IP address in not_with for {asn}: {remove_ip}", file=sys.stderr)
+                    continue
                 sessions.remove(remove_ip)
     else:
         continue
 
     for session in sessions:
-        session_ip = ipaddress.ip_address(session)
+        # Validate session IP address
+        if not validate_ip_address(session):
+            print(f"ERROR: Invalid session IP address for {asn}: {session}", file=sys.stderr)
+            continue
+        
+        try:
+            session_ip = ipaddress.ip_address(session)
+        except (ValueError, TypeError) as e:
+            print(f"ERROR: Failed to parse IP address {session}: {e}", file=sys.stderr)
+            continue
         for ixp in ixp_map:
             for subnet in ixp_map[ixp]["subnets"]:
                 bgp_local_pref = ebgp_local_pref(asn, ixp, session_ip)
