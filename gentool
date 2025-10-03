@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+
+"""
+    AutoNet
+
+    Network Automation Toolchain
+
+    (c) 2014-2017 Job Snijders <job@instituut.net>
+    (c) 2017-2023 Network Operators <routers@example.net>
+
+"""
+
+import argparse
+import logging
+import os
+import re
+import sys
+
+import hiyapyco
+from jinja2 import Environment, FileSystemLoader
+
+
+# Allow regex matching in templates
+def is_regex_match(
+    value="", pattern="", ignorecase=False, multiline=False, match_type="search"
+):
+    flags = 0
+    if ignorecase:
+        flags |= re.I
+    if multiline:
+        flags |= re.M
+    _regex = re.compile(pattern, flags=flags)
+    return bool(getattr(_regex, match_type, "search")(value))
+
+
+def render(tpl_path, context):
+    """Render a Jinja2 template with the provided context."""
+    try:
+        path, filename = os.path.split(tpl_path)
+
+        env = Environment(loader=FileSystemLoader(path or "./"))
+        env.tests["regex"] = is_regex_match
+
+        template = env.get_template(filename)
+        return template.render(context)
+
+    except FileNotFoundError:
+        logging.error(f"Template file not found: {tpl_path}")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Error rendering template {tpl_path}: {e}")
+        sys.exit(1)
+
+
+def main():
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+
+    parser.add_argument(
+        "-y",
+        dest="yamldata",
+        default="vars/main.yml",
+        type=str,
+        nargs="*",
+        help="""Location of the YAML data""",
+    )
+
+    parser.add_argument(
+        "-t",
+        dest="template",
+        type=str,
+        required=True,
+        help="""Location of the template""",
+    )
+
+    parser.add_argument(
+        "-o", dest="output", type=str, default="-", help="Output file (default: STDOUT)"
+    )
+
+    parser.add_argument(
+        "-d", dest="debug", action="store_true", help="""Enable debug"""
+    )
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "-4", dest="afi", action="store_const", const="ipv4", help="""IPv4 mode"""
+    )
+    group.add_argument(
+        "-6", dest="afi", action="store_const", const="ipv6", help="""IPv6 mode"""
+    )
+
+    args = parser.parse_args()
+    if args.debug:
+        print(args)
+
+    data = hiyapyco.load(*args.yamldata, method=hiyapyco.METHOD_MERGE)
+    data["afi"] = args.afi
+
+    if args.debug:
+        print(data)
+
+    if args.output == "-":
+        print(render(args.template, data))
+    else:
+        try:
+            with open(args.output, "w") as f:
+                f.write(render(args.template, data))
+        except IOError as e:
+            logging.error(f"Error writing to file {args.output}: {e}")
+            sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,97 @@
+
+filter peer_in_AS{{ asn }}_ipv{{ afi }}
+prefix set {{ prefix_set }};
+{% if blackhole_accept %}
+prefix set {{ loose_prefix_set }};  # Loose IRR filter for blackhole use
+{% endif %}
+{
+    # ignore bogon AS_PATHs
+    if is_bogon_aspath() then {
+        print "Reject: bogon AS_PATH: ", net, " ", bgp_path;
+        bgp_large_community.add((65000, rejected_route, r_bogon_aspath));
+        reject;
+    }
+
+    if ( is_local_more_specific() ) then {
+        print "Reject: 65000 more specific: ", net, " ", bgp_path, " filter: peer_in_AS{{ asn }}_ipv{{ afi }}";
+        bgp_large_community.add((65000, rejected_route, r_local_morespecific));
+        reject;
+    }
+    if ( is_bogon() ) then {
+        print "Reject: bogon: ", net, " ", bgp_path, " filter: peer_in_AS{{ asn }}_ipv{{ afi }}";
+        bgp_large_community.add((65000, rejected_route, r_bogon_prefix));
+        reject;
+    }
+
+    if ! is_acceptable_size() then {
+        print "Reject: too large or too small: ", net, " ", bgp_path, " filter: peer_in_AS{{ asn }}_ipv{{ afi }}";
+        bgp_large_community.add((65000, rejected_route, r_unacceptable_pfxlen));
+        reject;
+    }
+
+    # https://tools.ietf.org/html/rfc8326
+    allow_graceful_shutdown();
+
+{% if graceful_shutdown %}
+    bgp_community.add((65535, 0));
+    bgp_local_pref = 0;
+{% endif %}
+
+{% if blackhole_accept %}
+    # Per the peering manifest, we accept blackhole routes for this peer.
+    # For blackholed routes, we use loose IRR filtering
+    include "AS{{ asn }}.looseprefixset.bird.ipv{{ afi }}";
+    if ( (65535, 666) ~ bgp_community && net ~ {{ loose_prefix_set }}) then {
+        print "Accept blackhole: ", net, " filter: peer_in_AS{{ asn }}_ipv{{ afi }}";
+        dest = RTD_BLACKHOLE;
+        accept;
+    }
+{% endif %}
+
+{% if peer_type == "peer" %}
+    # Scrub BGP Communities (RFC 7454 Section 11) from peering partners
+    bgp_community.delete([(65000, *)]);
+    bgp_large_community.delete([(65000, *, *)]);
+
+{% if not blackhole_accept %}
+    # Scrub BLACKHOLE Community from peering partners
+    bgp_community.delete((65535, 666));
+
+{% endif %}
+    # Mark peering routes with our BGP communities
+    bgp_community.add((65000,1)); /* mark peering routes as peering routes */
+    bgp_large_community.add((65000, 0, 1)); /* mark peering routes as peering routes */
+{% if ixp_community %}
+    bgp_large_community.add((65000, ixp_route, {{ixp_community}})); /* mark the IXP where the prefix is learned */
+{% endif %}
+{% endif %}
+
+{% if rpki.validation %}
+    reject_rpki_invalid();
+{% endif %}
+
+    include "AS{{ asn }}.prefixset.bird.ipv{{ afi }}";
+    if (net ~ {{ prefix_set }}{% if rpki.validation %} || (65000, 5, 2) ~ bgp_large_community{% endif %}) then {
+        bgp_med = 0;
+
+{%- if peer_type == "downstream" %}
+        bgp_community.add((65000,2));
+        bgp_large_community.add((65000,0, 2));
+        if (65000, 50) ~ bgp_community then bgp_local_pref = 50;
+        if (65000, 150) ~ bgp_community then bgp_local_pref = 150;
+        if (65000, 1, 50) ~ bgp_large_community then bgp_local_pref = 50;
+        if (65000, 1, 150) ~ bgp_large_community then bgp_local_pref = 150;
+{%- endif %}
+
+        # classifications
+        if (net ~ {{ prefix_set }}) then {
+            bgp_community.add((65000, 101));
+            bgp_large_community.add((65000, 5, 1));
+        }
+       accept;
+    }
+    print "Reject: No IRR? ", net, " ", bgp_path, " filter: peer_in_AS{{ asn }}_ipv{{ afi }}";
+    bgp_large_community.add((65000, rejected_route, r_no_irr));
+    reject;
+}
+

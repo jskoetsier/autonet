@@ -1,0 +1,27 @@
+hostname: "eunetworks-3.router.nl.example.net"
+shortname: "eunetworks3"
+
+router_id: "94.142.247.6"
+
+interfaces:
+  backbone:
+    - nic: "lo"         # loopback
+    - nic: "enp1s0f3"   # internal wire to eunetworks-2
+      cost: 100
+      maintenance: False
+    - nic: "eno1.130"   # backbone to dc5-2
+      cost: 200
+      bfd: True
+      maintenance: False
+  external:
+    - nic: "eno2.100"   # members shared subnet
+    - nic: "eno2.101"   # powerbars
+    - nic: "eno2.204"   # vlan member 4
+    - nic: "eno2.205"   # vlan member 5
+    - nic: "enp1s0f2"   # IX 4
+    - nic: "enp1s0f1"   # Transit D
+
+members_bgp_source:
+  default:
+    ipv4: "94.142.240.252"
+    ipv6: "2a02:898:0:20::e1"

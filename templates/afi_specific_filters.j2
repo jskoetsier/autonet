@@ -1,0 +1,154 @@
+{%- if afi == "ipv4" -%}
+{%- set maxlength = 32 -%}
+{%- elif afi == "ipv6" -%}
+{%- set maxlength = 128 -%}
+{%- endif -%}
+filter ospf_export {
+{%- if afi == "ipv4" %}
+    if net ~ [ 94.142.247.0/28{32,32} ] then accept;
+    if (net = 0.0.0.0/0) then reject;
+{%- elif afi == "ipv6" %}
+    if net ~ [ 2a02:898:0:300:0:0:0:0/64{128,128} ] then accept;
+    if (net = ::/0) then reject;
+{%- endif %}
+    if (source = RTS_DEVICE) then accept;
+    if (source = RTS_STATIC) then accept;
+    reject;
+}
+
+function not_ospf_export()
+{
+{%- if afi == "ipv4" %}
+    if net ~ [ 94.142.247.0/28{32,32} ] then reject;
+{%- elif afi == "ipv6" %}
+    if net ~ [ 2a02:898:0:300:0:0:0:0/64{128,128} ] then reject;
+{%- endif %}
+    if (source = RTS_DEVICE) then reject;
+    if (source = RTS_STATIC) then reject;
+    if (source = RTS_OSPF) then reject;
+    if (source = RTS_OSPF_EXT2) then reject;
+    accept;
+}
+
+function is_local_supernet()
+prefix set organization;
+{
+    organization = [
+{%-
+for item in organization.supernets
+if (afi == "ipv4" and "." in item.prefix) or (afi == "ipv6" and ":" in item.prefix)
+%}
+        {{ item.prefix }}/{{ item.length }}
+{%- if not loop.last %},{% endif -%}
+{%- if item.comment %}  /* {{ item.comment }} */{% endif -%}
+{%- endfor %}
+    ];
+    if net ~ organization then return true;
+    return false;
+}
+
+function is_organization_more_specific()
+prefix set organization;
+{
+    organization = [
+{%-
+for item in organization.supernets
+if (afi == "ipv4" and "." in item.prefix) or (afi == "ipv6" and ":" in item.prefix)
+%}
+        {{ item.prefix }}/{{ item.length }}{{ "{" }}{{ item.length }},{{ maxlength }}{{ "}" }}
+{%- if not loop.last %},{% endif -%}
+{%- if item.comment %}  /* {{ item.comment }} */{% endif -%}
+{% endfor %}
+    ];
+    if net ~ organization then return true;
+    return false;
+}
+
+function is_organization_beacon()
+{
+    # Prefix must fall within one of our supernets, otherwise it cannot be a beacon.
+    if (!is_organization_more_specific()) then return false;
+
+{%-
+for item in organization.beacons
+if (afi == "ipv4" and "." in item.prefix) or (afi == "ipv6" and ":" in item.prefix)
+%}
+    if (net = {{ item.prefix }}/{{ item.length }}) then return true;
+{%- if item.comment %}  /* {{ item.comment }} */{% endif -%}
+{%- endfor %}
+    return false;
+}
+
+function is_bogon()
+prefix set bogons;
+{
+    bogons = [
+{%-
+for item in bogons
+if (afi == "ipv4" and "." in item.prefix) or (afi == "ipv6" and ":" in item.prefix)
+%}
+        {{ item.prefix }}/{{ item.length }}{{ "{" }}{{ item.length }},{{ maxlength }}{{ "}" }}
+{%- if not loop.last %},{% endif -%}
+{%- if item.comment %}  /* {{ item.comment }} */{% endif -%}
+{% endfor %}
+    ];
+    if net ~ bogons then return true;
+    return false;
+}
+
+function is_bogon_aspath()
+int set bogon_asns;
+{
+    bogon_asns = [0, 23456, 64496..131071, 4200000000..4294967295];
+    if (bgp_path ~ bogon_asns) then {
+        return true;
+    }
+    return false;
+}
+
+function is_acceptable_size()
+prefix set acceptable_sizes;
+{
+{%- if afi == "ipv4" %}
+    acceptable_sizes = [ 0.0.0.0/0{8,24} ];
+{%- elif afi == "ipv6" %}
+    acceptable_sizes = [ 2000::/3{12,48} ];
+{%- endif %}
+    if net ~ acceptable_sizes then return true;
+    return false;
+}
+
+{% if rpki.validation %}
+function reject_rpki_invalid()
+{
+    {% if rpki['whitelist'][afi] is not none -%}
+    if (net ~ rpkiwhitelist) then {
+        bgp_community.add((65000, 104));
+        bgp_large_community.add((65000, 5, 4));
+        accept;
+    }
+    else {% endif %}if (roa_check(ROAS{{ afi|replace('ipv', '') }}) = ROA_VALID) then {
+        /* add rfc8097 marker to routes for which a valid matching ROA exists */
+        bgp_community.add((65000, 102));
+        bgp_large_community.add((65000, 5, 2));
+    }
+    else if (roa_check(ROAS{{ afi|replace('ipv', '') }}) = ROA_INVALID) then {
+        print "Reject: RPKI ROA check failed for ", net, " ", bgp_path, " protocol: ", proto;
+        bgp_large_community.add((65000, rejected_route, r_rpki_invalid));
+        reject;
+    }
+}
+{% endif %}
+
+{%- if afi == "ipv4" -%}{%- set blackhole_network_length = 24 -%}
+{%- elif afi == "ipv6" -%}{%- set blackhole_network_length = 64 -%}
+{%- endif -%}
+function blackhole_export() {
+    if proto = "blackhole1" then {
+        if (net.len = {{ blackhole_network_length }} && is_organization_more_specific() ) then {
+            accept;
+        }
+        reject;
+    }
+    reject;
+}

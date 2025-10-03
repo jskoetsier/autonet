@@ -1,0 +1,43 @@
+template bgp autonet_ibgp {
+    local as 65000;
+    {{ afi }} {
+        import filter {
+            # https://tools.ietf.org/html/draft-ietf-grow-bgp-gshut
+            allow_graceful_shutdown();
+
+            # RFC 7999
+            if (65535, 666) ~ bgp_community then dest = RTD_BLACKHOLE;
+
+            # the rest
+            accept;
+        };
+        export filter {
+            if proto = "blackhole1" then {
+                bgp_community.add((65535,666));
+                accept;
+            }
+            if dest = RTD_BLACKHOLE then {
+                reject;
+            }
+
+            # Filter out OSPF and Loopbacks
+            not_ospf_export();
+
+            accept;
+        };
+        next hop self;
+    };
+    #bfd on;
+}
+
+{%- for neighbor in bgp if not neighbor == shortname %}
+protocol bgp ibgp_{{ neighbor }} from autonet_ibgp {
+    neighbor {{ bgp[neighbor][afi] }} as 65000;
+    source address {{ bgp[shortname][afi] }};
+{%- if 'maintenance_mode' in bgp[neighbor] %}
+{%- if bgp[neighbor]['maintenance_mode'] %}
+    default bgp_local_pref 0;
+{%- endif %}
+{%- endif %}
+}
+{%- endfor %}

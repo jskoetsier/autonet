@@ -1,0 +1,30 @@
+hostname: "dc5-2.router.nl.example.net"
+shortname: "dc52"
+
+router_id: "94.142.247.2"
+
+interfaces:
+  backbone:
+    - nic: "lo"         # loopback
+    - nic: "enp1s0f3"   # internal wire to dc5-1
+      cost: 100
+      maintenance: False
+    - nic: "eno1.130"   # backbone to eunetworks-3
+      cost: 200
+      bfd: True
+      maintenance: False
+  external:
+    - nic: "eno2.100"   # members shared subnet
+    - nic: "eno2.101"   # powerbars
+    - nic: "eno2.201"   # vlan member 1
+    - nic: "eno2.202"   # vlan member 2
+    - nic: "enp1s0f2"   # IX 2
+    - nic: "enp1s0f1"   # Transit B
+
+members_bgp_source:
+  default:
+    ipv4: "94.142.244.253"
+    ipv6: "2a02:898::d2"
+  300:
+    ipv4: "192.168.0.2"
+    ipv6: "fd00::2"
