@@ -21,22 +21,22 @@ import json
 try:
     with open('vars/generic.yml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
-    
+
     if config is None:
         print('', end='')
         sys.exit(1)
-    
+
     # Navigate nested keys (e.g., 'rpki.validation')
     keys = '$varname'.split('.')
     current = config
-    
+
     for key in keys:
         if isinstance(current, dict) and key in current:
             current = current[key]
         else:
             print('', end='')
             sys.exit(1)
-    
+
     # Handle different data types properly
     if isinstance(current, (str, int, float)):
         print(current, end='')
@@ -49,7 +49,7 @@ try:
     else:
         print('', end='')
         sys.exit(1)
-        
+
 except (yaml.YAMLError, FileNotFoundError, PermissionError, UnicodeDecodeError, KeyError, TypeError) as e:
     print('', end='')
     sys.exit(1)

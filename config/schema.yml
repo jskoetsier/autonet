@@ -5,21 +5,21 @@
 autonet:
   version: "2.0"
   schema_version: "1.0"
-  
+
   # Core validation rules
   validation:
     strict_mode: true
     fail_on_warnings: false
     schema_validation: true
-    
+
     # Required configuration sections
     required_sections:
       - "builddir"
-      - "stagedir" 
+      - "stagedir"
       - "peerings_url"
       - "ixp_map"
       - "bgp"
-    
+
     # Optional sections with defaults
     optional_sections:
       pdb_apikey: null
@@ -27,7 +27,7 @@ autonet:
       irr_order: "NTTCOM,INTERNAL,RADB,RIPE"
       process: {}
       rpki: {}
-      
+
   # Security configuration
   security:
     # API key encryption settings
@@ -36,21 +36,21 @@ autonet:
     allowed_encryption_methods:
       - "fernet"
       - "environment"
-    
+
     # Input validation rules
     validation_rules:
       asn_format: "^AS\\d+$"
       ip_address_validation: true
       as_set_format: "^(AS\\d+:)?AS-[A-Z0-9\\-]+$"
       router_name_format: "^[a-zA-Z0-9.-]+$"
-    
+
     # SSH security settings
     ssh:
       strict_host_key_checking: true
       key_permissions: [400, 600]
       connection_timeout: 30
       max_retries: 3
-  
+
   # Performance configuration
   performance:
     # Memory management
@@ -60,7 +60,7 @@ autonet:
       page_size: 2000
       gc_frequency: 10000
       max_memory_mb: 512
-    
+
     # Network optimization
     network:
       connection_pool: true
@@ -71,13 +71,13 @@ autonet:
         total: 60
       retry_backoff_factor: 2
       max_retries: 3
-    
+
     # Parallel processing
     concurrency:
       max_workers: 20
       worker_scaling: "auto"  # auto, fixed, adaptive
       cpu_multiplier: 2
-  
+
   # API configuration
   api:
     peeringdb:
@@ -93,7 +93,7 @@ autonet:
       rate_limiting:
         requests_per_minute: 100
         burst_size: 10
-  
+
   # Logging configuration
   logging:
     level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -105,7 +105,7 @@ autonet:
     rotation:
       max_size_mb: 100
       backup_count: 5
-  
+
   # Plugin system configuration
   plugins:
     enabled: true
@@ -114,7 +114,7 @@ autonet:
       - "plugins"
       - "/etc/autonet/plugins"
       - "/usr/local/lib/autonet/plugins"
-    
+
     # Vendor plugins
     vendors:
       bird:
@@ -126,15 +126,15 @@ autonet:
           bird6_bin: "/usr/sbin/bird"
           birdc_bin: "/usr/sbin/birdc"
           birdc6_bin: "/usr/local/bin/birdc6"
-      
+
       bird2:
-        class: "Bird2VendorPlugin" 
+        class: "Bird2VendorPlugin"
         module: "plugins.vendors.bird2"
         enabled: false
         config:
           bird_bin: "/usr/sbin/bird"
           birdc_bin: "/usr/sbin/birdc"
-  
+
   # State management configuration
   state:
     backend: "sqlite"  # sqlite, postgresql, mysql
@@ -146,12 +146,12 @@ autonet:
       # username: "autonet"
       # password: "encrypted_password"
       # database: "autonet"
-    
+
     retention:
       generations: 100      # Keep last 100 generations
       days: 30              # Keep data for 30 days
       cleanup_frequency: "daily"
-    
+
     events:
       track_generations: true
       track_deployments: true
@@ -160,7 +160,7 @@ autonet:
 
 # Schema definitions for validation
 schemas:
-  
+
   # Generic configuration schema
   generic_config:
     type: "object"
@@ -175,32 +175,32 @@ schemas:
         type: "string"
         pattern: "^/[a-zA-Z0-9/_-]+$"
         description: "Build directory path"
-      
+
       stagedir:
         type: "string"
         pattern: "^/[a-zA-Z0-9/_-]+$"
         description: "Staging directory path"
-      
+
       peerings_url:
         type: "string"
         format: "uri"
         description: "URL to peerings configuration"
-      
+
       pdb_apikey:
         type: "string"
         pattern: "^(ENCRYPTED:[A-Za-z0-9+/=]+|[a-f0-9]{32,})$"
         description: "PeeringDB API key (encrypted or plaintext)"
-      
+
       irr_source_host:
         type: "string"
         format: "hostname"
         description: "IRR source hostname"
-      
+
       irr_order:
         type: "string"
         pattern: "^[A-Z0-9,_-]+$"
         description: "IRR source order"
-      
+
       ixp_map:
         type: "object"
         patternProperties:
@@ -230,7 +230,7 @@ schemas:
                 type: "integer"
                 minimum: 0
                 maximum: 4294967295
-      
+
       bgp:
         type: "object"
         patternProperties:
@@ -260,7 +260,7 @@ schemas:
               maintenance_mode:
                 type: "boolean"
                 default: false
-      
+
       rpki:
         type: "object"
         properties:
@@ -280,7 +280,7 @@ schemas:
                 items:
                   type: "string"
                   format: "ipv6_cidr"
-  
+
   # Router-specific configuration schema
   router_config:
     type: "object"
@@ -299,7 +299,7 @@ schemas:
       router_id:
         type: "string"
         format: "ipv4"
-      
+
       interfaces:
         type: "object"
         properties:
@@ -323,7 +323,7 @@ schemas:
                 bfd:
                   type: "boolean"
                   default: false
-          
+
           external:
             type: "array"
             items:
@@ -333,7 +333,7 @@ schemas:
                 nic:
                   type: "string"
                   pattern: "^[a-zA-Z0-9.-]+$"
-      
+
       members_bgp_source:
         type: "object"
         properties:
@@ -350,36 +350,36 @@ schemas:
 
 # Validation rules and constraints
 validation_rules:
-  
+
   # File validation
   files:
     max_size_mb: 10
     allowed_extensions: [".yml", ".yaml"]
     encoding: "utf-8"
-  
+
   # Network validation
   network:
     asn_range:
       min: 1
       max: 4294967295
       exclude_private: false  # Allow private ASNs for testing
-    
+
     ip_validation:
       strict_rfc: true
       allow_private: true
       allow_loopback: false
       allow_multicast: false
-  
+
   # String validation
   strings:
     hostname:
       max_length: 253
       allow_underscores: false
-    
+
     asn:
       case_insensitive: true
       require_as_prefix: true
-    
+
     as_set:
       case_insensitive: true
       max_nesting_levels: 3
@@ -390,12 +390,12 @@ error_handling:
     fail_fast: false
     collect_all_errors: true
     detailed_messages: true
-  
+
   recovery_strategies:
     missing_optional_fields: "use_defaults"
     invalid_format: "skip_with_warning"
     network_errors: "retry_with_backoff"
-  
+
   exit_codes:
     success: 0
     config_error: 1
@@ -413,7 +413,7 @@ environments:
       fail_on_warnings: false
     security:
       encrypt_api_keys: false
-  
+
   staging:
     logging:
       level: "INFO"
@@ -424,7 +424,7 @@ environments:
       peeringdb:
         cache:
           ttl_seconds: 3600  # 1 hour for faster testing
-  
+
   production:
     logging:
       level: "WARNING"

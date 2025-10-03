@@ -86,7 +86,7 @@ AutoNet v2.0 uses a modern three-tier architecture:
 │ Configuration   │ │ Plugin System   │ │ State Management    │
 │ Management      │ │                 │ │                     │
 │ • Schema Valid. │ │ • Vendor Support│ │ • Event Tracking    │
-│ • Env. Overrides│ │ • Auto-Discovery│ │ • Performance Mon.  │  
+│ • Env. Overrides│ │ • Auto-Discovery│ │ • Performance Mon.  │
 │ • Secure Keys   │ │ • Extensibility │ │ • History & Analytics│
 └─────────────────┘ └─────────────────┘ └─────────────────────┘
 ┌─────────────────────────────────────────────────────────────┐
@@ -105,7 +105,7 @@ AutoNet v2.0 uses a modern three-tier architecture:
 
 #### 2. Plugin System (`lib/plugin_system.py`)
 - **Vendor Plugins**: Support for BIRD, BIRD2, FRR, Cisco, Juniper
-- **Filter Plugins**: Custom prefix filtering implementations  
+- **Filter Plugins**: Custom prefix filtering implementations
 - **Auto-Discovery**: Automatic plugin loading from configured directories
 - **Lifecycle Management**: Plugin initialization, cleanup, and dependency resolution
 
@@ -162,7 +162,7 @@ bgp:
     ipv4: 192.0.2.1
     ipv6: 2001:db8::1
     vendor: bird
-  
+
   router2:
     fqdn: router2.example.net
     ipv4: 192.0.2.2
@@ -297,11 +297,11 @@ class CustomVendorPlugin(VendorPlugin):
             plugin_type=PluginType.VENDOR,
             # ... other fields
         )
-    
+
     def generate_config(self, peer_info, template_vars):
         # Custom configuration generation logic
         pass
-    
+
     def validate_config(self, config_content):
         # Custom validation logic
         pass
@@ -440,7 +440,7 @@ export AUTONET_PEERINGDB_KEY="your-api-key"  # Enhanced security
 
 ## 🤝 Contributing
 
-AutoNet welcomes contributions! 
+AutoNet welcomes contributions!
 
 ### Development Setup
 
@@ -497,6 +497,6 @@ This version represents a **complete rewrite** of the original AutoNet by Colocl
 
 ---
 
-**AutoNet v2.0** - From the original idea by Coloclue (KEES) to enterprise-grade network automation. 
+**AutoNet v2.0** - From the original idea by Coloclue (KEES) to enterprise-grade network automation.
 
 🚀 **Ready for production** • 🛡️ **Enterprise security** • 📊 **Full observability** • 🔌 **Infinitely extensible**

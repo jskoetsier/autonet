@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Exit codes for consistency
 readonly EXIT_SUCCESS=0
-readonly EXIT_CONFIG_ERROR=1  
+readonly EXIT_CONFIG_ERROR=1
 readonly EXIT_TOOL_ERROR=2
 readonly EXIT_SSH_ERROR=3
 readonly EXIT_VALIDATION_ERROR=4
@@ -28,31 +28,31 @@ command_exists() {
 # Function to validate SSH key
 validate_ssh_key() {
     local key_path="$1"
-    
+
     if [[ ! -f "$key_path" ]]; then
         error_exit "SSH key not found at $key_path" $EXIT_SSH_ERROR
     fi
-    
+
     if [[ ! -r "$key_path" ]]; then
-        error_exit "SSH key at $key_path is not readable" $EXIT_SSH_ERROR  
+        error_exit "SSH key at $key_path is not readable" $EXIT_SSH_ERROR
     fi
-    
+
     # Check key permissions (should be 600 or 400)
     local perms
     perms=$(stat -f "%Lp" "$key_path" 2>/dev/null || stat -c "%a" "$key_path" 2>/dev/null || echo "000")
     if [[ "$perms" != "600" ]] && [[ "$perms" != "400" ]]; then
         log "WARNING: SSH key permissions are $perms, should be 600 or 400"
     fi
-    
+
     # Try to load the key to validate format
     if ! ssh-keygen -l -f "$key_path" >/dev/null 2>&1; then
         error_exit "SSH key at $key_path appears to be invalid or corrupted" $EXIT_SSH_ERROR
     fi
-    
+
     log "SSH key validated: $key_path"
 }
 
-# Function to sanitize input for shell safety  
+# Function to sanitize input for shell safety
 sanitize_input() {
     local input="$1"
     # Remove potentially dangerous characters
@@ -72,13 +72,13 @@ validate_bird_config() {
     local config_file="$1"
     local config_type="$2"  # bird or bird6
     local router="$3"
-    
+
     if [[ ! -f "$config_file" ]]; then
         error_exit "Configuration file not found: $config_file" $EXIT_VALIDATION_ERROR
     fi
-    
+
     log "Validating $config_type configuration: $config_file"
-    
+
     # Use appropriate BIRD binary for validation
     local bird_binary
     if [[ "$config_type" == "bird6" ]]; then
@@ -86,18 +86,18 @@ validate_bird_config() {
     else
         bird_binary="$BIRD_BIN"
     fi
-    
+
     # Perform syntax check
     if ! "$bird_binary" -p -c "$config_file" >/dev/null 2>&1; then
         log "ERROR: $config_type configuration validation failed for $router"
-        
+
         # Show detailed error for debugging
         log "Detailed validation output:"
         "$bird_binary" -p -c "$config_file" 2>&1 | sed "s/^/  ERROR: /"
-        
+
         return $EXIT_VALIDATION_ERROR
     fi
-    
+
     log "✓ $config_type configuration validated successfully: $config_file"
     return 0
 }
@@ -106,14 +106,14 @@ validate_bird_config() {
 comprehensive_config_validation() {
     local router="$1"
     local config_dir="${STAGEDIR}/${router}"
-    
+
     log "Performing comprehensive validation for $router"
-    
+
     # Check if configuration directory exists
     if [[ ! -d "$config_dir" ]]; then
         error_exit "Configuration directory not found: $config_dir" $EXIT_CONFIG_ERROR
     fi
-    
+
     # Validate main BIRD configurations
     local bird_configs=("bird.conf" "bird6.conf")
     for config in "${bird_configs[@]}"; do
@@ -124,7 +124,7 @@ comprehensive_config_validation() {
             else
                 validate_bird_config "$config_path" "bird" "$router"
             fi
-            
+
             if [[ $? -ne 0 ]]; then
                 return $EXIT_VALIDATION_ERROR
             fi
@@ -132,16 +132,16 @@ comprehensive_config_validation() {
             log "WARNING: Configuration file not found: $config_path"
         fi
     done
-    
+
     # Validate that essential configuration sections exist
     validate_config_sections "$config_dir" "$router"
-    
+
     # Validate prefix sets exist and are not empty
     validate_prefix_sets "$config_dir" "$router"
-    
+
     # Validate router-specific settings
     validate_router_settings "$config_dir" "$router"
-    
+
     log "✓ Comprehensive validation completed successfully for $router"
     return 0
 }
@@ -150,32 +150,32 @@ comprehensive_config_validation() {
 validate_config_sections() {
     local config_dir="$1"
     local router="$2"
-    
+
     log "Validating configuration sections for $router"
-    
+
     # Essential configuration files that should exist
     local essential_files=(
         "header-ipv4.conf"
-        "header-ipv6.conf"  
+        "header-ipv6.conf"
         "interfaces-ipv4.conf"
         "interfaces-ipv6.conf"
         "peerings/peers.ipv4.conf"
         "peerings/peers.ipv6.conf"
     )
-    
+
     for file in "${essential_files[@]}"; do
         local file_path="${config_dir}/${file}"
         if [[ ! -f "$file_path" ]]; then
             log "ERROR: Essential configuration file missing: $file_path"
             return $EXIT_VALIDATION_ERROR
         fi
-        
+
         # Check if file is not empty
         if [[ ! -s "$file_path" ]]; then
             log "WARNING: Configuration file is empty: $file_path"
         fi
     done
-    
+
     log "✓ Configuration sections validated for $router"
     return 0
 }
@@ -184,33 +184,33 @@ validate_config_sections() {
 validate_prefix_sets() {
     local config_dir="$1"
     local router="$2"
-    
+
     log "Validating prefix sets for $router"
-    
+
     local prefix_dir="${config_dir}/peerings"
     if [[ ! -d "$prefix_dir" ]]; then
         log "ERROR: Peerings directory not found: $prefix_dir"
         return $EXIT_VALIDATION_ERROR
     fi
-    
+
     # Count prefix sets
     local ipv4_prefixes=0
     local ipv6_prefixes=0
-    
+
     if [[ -f "${prefix_dir}/peers.ipv4.conf" ]]; then
         ipv4_prefixes=$(grep -c "define " "${prefix_dir}/peers.ipv4.conf" 2>/dev/null || echo "0")
     fi
-    
+
     if [[ -f "${prefix_dir}/peers.ipv6.conf" ]]; then
         ipv6_prefixes=$(grep -c "define " "${prefix_dir}/peers.ipv6.conf" 2>/dev/null || echo "0")
     fi
-    
+
     log "Found $ipv4_prefixes IPv4 prefix sets and $ipv6_prefixes IPv6 prefix sets"
-    
+
     if [[ $ipv4_prefixes -eq 0 ]] && [[ $ipv6_prefixes -eq 0 ]]; then
         log "WARNING: No prefix sets found for $router"
     fi
-    
+
     log "✓ Prefix sets validated for $router"
     return 0
 }
@@ -219,9 +219,9 @@ validate_prefix_sets() {
 validate_router_settings() {
     local config_dir="$1"
     local router="$2"
-    
+
     log "Validating router-specific settings for $router"
-    
+
     # Validate router ID is set
     if [[ -f "${config_dir}/header-ipv4.conf" ]]; then
         if ! grep -q "router id" "${config_dir}/header-ipv4.conf"; then
@@ -229,7 +229,7 @@ validate_router_settings() {
             return $EXIT_VALIDATION_ERROR
         fi
     fi
-    
+
     # Validate that interfaces are configured
     local interface_files=("interfaces-ipv4.conf" "interfaces-ipv6.conf")
     for file in "${interface_files[@]}"; do
@@ -240,7 +240,7 @@ validate_router_settings() {
             fi
         fi
     done
-    
+
     log "✓ Router-specific settings validated for $router"
     return 0
 }
@@ -248,14 +248,14 @@ validate_router_settings() {
 # Function to validate YAML configuration schema
 validate_yaml_schema() {
     local yaml_file="$1"
-    
+
     if [[ ! -f "$yaml_file" ]]; then
         log "ERROR: YAML file not found: $yaml_file"
         return $EXIT_VALIDATION_ERROR
     fi
-    
+
     log "Validating YAML schema: $yaml_file"
-    
+
     # Use Python to validate YAML syntax and structure
     python3 -c "
 import yaml
@@ -266,21 +266,21 @@ required_sections = ['builddir', 'stagedir', 'peerings_url', 'ixp_map', 'bgp']
 try:
     with open('$yaml_file', 'r') as f:
         config = yaml.safe_load(f)
-    
+
     if config is None:
         print('ERROR: YAML file is empty or invalid')
         sys.exit(1)
-    
+
     # Check for required sections
     missing_sections = []
     for section in required_sections:
         if section not in config:
             missing_sections.append(section)
-    
+
     if missing_sections:
         print(f'ERROR: Missing required sections: {missing_sections}')
         sys.exit(1)
-    
+
     # Validate ixp_map structure
     if 'ixp_map' in config:
         for ixp, ixp_config in config['ixp_map'].items():
@@ -289,7 +289,7 @@ try:
                 if field not in ixp_config:
                     print(f'ERROR: Missing {field} in ixp_map.{ixp}')
                     sys.exit(1)
-    
+
     # Validate bgp structure
     if 'bgp' in config:
         for router, router_config in config['bgp'].items():
@@ -298,9 +298,9 @@ try:
                 if field not in router_config:
                     print(f'ERROR: Missing {field} in bgp.{router}')
                     sys.exit(1)
-    
+
     print('✓ YAML schema validation passed')
-    
+
 except yaml.YAMLError as e:
     print(f'ERROR: YAML syntax error: {e}')
     sys.exit(1)
@@ -314,7 +314,7 @@ except Exception as e:
         log "ERROR: YAML schema validation failed for $yaml_file"
         return $EXIT_VALIDATION_ERROR
     fi
-    
+
     log "✓ YAML schema validated successfully: $yaml_file"
     return 0
 }
@@ -337,11 +337,11 @@ fi
 # Get configurable paths from AutoNet configuration
 BUILDDIR=${BUILDDIR:-$(getconfig 'builddir' '/opt/routefilters')}
 if [[ -z "$BUILDDIR" ]]; then
-    error_exit "BUILDDIR not configured" $EXIT_CONFIG_ERROR  
+    error_exit "BUILDDIR not configured" $EXIT_CONFIG_ERROR
 fi
 log "Building in: $BUILDDIR"
 
-STAGEDIR=${STAGEDIR:-$(getconfig 'stagedir' '/opt/router-staging')}  
+STAGEDIR=${STAGEDIR:-$(getconfig 'stagedir' '/opt/router-staging')}
 if [[ -z "$STAGEDIR" ]]; then
     error_exit "STAGEDIR not configured" $EXIT_CONFIG_ERROR
 fi
@@ -371,7 +371,7 @@ if [[ ${#routers[@]} -eq 0 ]]; then
     log "WARNING: No routers configured, using defaults"
     routers=(
         'dc5-1.router.nl.example.net'
-        'dc5-2.router.nl.example.net' 
+        'dc5-2.router.nl.example.net'
         'eunetworks-2.router.nl.example.net'
         'eunetworks-3.router.nl.example.net'
     )
@@ -476,29 +476,29 @@ if [ "${1:-}" == "push" ]; then
 
     # Perform comprehensive validation before pushing
     log "Performing comprehensive validation before deployment..."
-    
+
     # Validate YAML configuration schema first
     if ! validate_yaml_schema "vars/generic.yml"; then
         error_exit "YAML schema validation failed" $EXIT_VALIDATION_ERROR
     fi
-    
+
     # Validate each router configuration comprehensively
     validation_errors=0
     for router in "${routers[@]}"; do
         log "Performing comprehensive validation for $router"
-        
+
         if ! comprehensive_config_validation "$router"; then
             log "ERROR: Comprehensive validation failed for $router"
             ((validation_errors++))
         fi
     done
-    
+
     if [[ $validation_errors -gt 0 ]]; then
         log "ERROR: $validation_errors router(s) failed validation"
         eval "$(ssh-agent -k)"
         error_exit "Configuration validation failed before deployment" $EXIT_VALIDATION_ERROR
     fi
-    
+
     log "✓ All configurations validated successfully, proceeding with deployment"
 
     # Push configurations to routers

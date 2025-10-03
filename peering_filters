@@ -41,7 +41,7 @@ import base64
 from lib.config_manager import get_config_manager, ConfigurationManager
 from lib.plugin_system import get_plugin_manager, initialize_plugin_system, PluginType
 from lib.state_manager import (
-    get_state_manager, StateManager, StateEvent, GenerationRecord, 
+    get_state_manager, StateManager, StateEvent, GenerationRecord,
     EventType, track_event
                           )
 
@@ -105,7 +105,7 @@ def sanitize_shell_input(input_str: str) -> str:
     """Sanitize string for safe shell usage"""
     if not isinstance(input_str, str):
         raise ValidationError("Input must be a string")
-    
+
     # Remove any potentially dangerous characters
     sanitized = re.sub(r'[;&|`$(){}[\]<>]', '', input_str)
     return shlex.quote(sanitized)
@@ -117,7 +117,7 @@ def get_api_key(key_name: str, config_key: str = None) -> str:
     env_key = os.environ.get(f'AUTONET_{key_name.upper()}_KEY')
     if env_key:
         return env_key
-    
+
     # Fall back to encrypted config if available
     if config_key and config_key in generic:
         encrypted_key = generic[config_key]
@@ -131,7 +131,7 @@ def get_api_key(key_name: str, config_key: str = None) -> str:
         else:
             print(f"WARNING: API key {key_name} is stored in plaintext. Consider using encryption or environment variables", file=sys.stderr)
             return encrypted_key
-    
+
     raise ConfigurationError(f"API key {key_name} not found in environment or config")
 
 
@@ -144,7 +144,7 @@ def encrypt_api_key(key: str, encryption_key: str = None) -> str:
             encryption_key = Fernet.generate_key().decode()
             print(f"Generated encryption key: {encryption_key}", file=sys.stderr)
             print("Save this key securely and set AUTONET_ENCRYPTION_KEY environment variable", file=sys.stderr)
-    
+
     try:
         if isinstance(encryption_key, str):
             encryption_key = encryption_key.encode()
@@ -161,7 +161,7 @@ def decrypt_api_key(encrypted_key: str, encryption_key: str = None) -> str:
         encryption_key = os.environ.get('AUTONET_ENCRYPTION_KEY')
         if not encryption_key:
             raise ConfigurationError("AUTONET_ENCRYPTION_KEY environment variable not set")
-    
+
     try:
         if isinstance(encryption_key, str):
             encryption_key = encryption_key.encode()
@@ -178,7 +178,7 @@ def safe_file_write(filename: str, content: str, mode: str = 'w') -> None:
     try:
         # Ensure directory exists
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(filename, mode, encoding='utf-8') as f:
             # Apply exclusive lock
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
@@ -199,19 +199,19 @@ def safe_file_check_and_update(filename: str, content: str, max_age_seconds: int
         if not os.path.exists(filename):
             safe_file_write(filename, content)
             return True
-        
+
         # Check if file needs updating (age-based)
         if time.time() - os.path.getmtime(filename) > max_age_seconds:
             safe_file_write(filename, content)
             return True
-        
+
         return False
     except Exception as e:
         raise FileOperationError(f"Failed to check/update file {filename}: {e}")
 
 
 # Memory-efficient streaming and pagination functions
-def stream_json_download(url: str, headers: Dict = None, timeout: int = 30, 
+def stream_json_download(url: str, headers: Dict = None, timeout: int = 30,
                         max_retries: int = 3, chunk_size: int = 8192) -> Iterator[bytes]:
     """Stream download JSON data in chunks to reduce memory usage"""
     if headers is None:
@@ -241,7 +241,7 @@ def stream_json_download(url: str, headers: Dict = None, timeout: int = 30,
             print(f"Request error streaming {url} (attempt {attempt + 1}/{max_retries}): {e}", file=sys.stderr)
             if attempt == max_retries - 1:
                 raise PeeringDBError(f"Request error streaming {url}: {e}")
-        
+
         # Wait before retrying (exponential backoff)
         if attempt < max_retries - 1:
             wait_time = 2 ** attempt
@@ -249,62 +249,62 @@ def stream_json_download(url: str, headers: Dict = None, timeout: int = 30,
             time.sleep(wait_time)
 
 
-def paginated_peeringdb_request(base_url: str, headers: Dict = None, 
+def paginated_peeringdb_request(base_url: str, headers: Dict = None,
                                page_size: int = 1000, max_pages: int = None) -> Generator[Dict, None, None]:
     """Paginate PeeringDB API requests to reduce memory usage"""
     if headers is None:
         headers = {}
-    
+
     page = 0
     total_processed = 0
-    
+
     while True:
         if max_pages and page >= max_pages:
             break
-            
+
         # Construct paginated URL
         paginated_url = f"{base_url}?limit={page_size}&skip={page * page_size}"
-        
+
         try:
             print(f"Fetching page {page + 1} from PeeringDB API (processed {total_processed} records)", file=sys.stderr)
-            
+
             # Use streaming download for memory efficiency
             chunks = []
             for chunk in stream_json_download(paginated_url, headers):
                 chunks.append(chunk)
-            
+
             data_str = b''.join(chunks).decode('utf-8')
             page_data = json.loads(data_str)
-            
+
             # Free up memory immediately
             del chunks, data_str
             gc.collect()
-            
+
             if "data" not in page_data:
                 print(f"WARNING: No 'data' field in response from {paginated_url}", file=sys.stderr)
                 break
-                
+
             data_items = page_data["data"]
             if not data_items:
                 print(f"No more data available, processed {total_processed} total records", file=sys.stderr)
                 break
-                
+
             # Yield each item individually for memory efficiency
             for item in data_items:
                 yield item
                 total_processed += 1
-                
+
             # Free memory after processing each page
             del page_data, data_items
             gc.collect()
-            
+
             # Check if we got fewer items than requested (last page)
             if len(data_items) < page_size:
                 print(f"Reached last page, processed {total_processed} total records", file=sys.stderr)
                 break
-                
+
             page += 1
-            
+
         except Exception as e:
             print(f"Error fetching page {page + 1}: {e}", file=sys.stderr)
             raise PeeringDBError(f"Failed to fetch paginated data from {base_url}: {e}")
@@ -313,43 +313,43 @@ def paginated_peeringdb_request(base_url: str, headers: Dict = None,
 def memory_efficient_pdb_processing(pdb_auth: Dict) -> Dict[int, List[str]]:
     """Process PeeringDB data with memory-efficient streaming"""
     print("Processing PeeringDB netixlan data with memory-efficient streaming...", file=sys.stderr)
-    
+
     pdb = {}
     processed_count = 0
-    
+
     try:
         # Use pagination for netixlan data
         for connection in paginated_peeringdb_request(
-            "https://www.peeringdb.com/api/netixlan", 
-            pdb_auth, 
+            "https://www.peeringdb.com/api/netixlan",
+            pdb_auth,
             page_size=2000  # Larger page size for efficiency
         ):
             asn = connection.get("asn")
             v4 = connection.get("ipaddr4")
             v6 = connection.get("ipaddr6")
-            
+
             if asn is None:
                 continue
-                
+
             if asn not in pdb:
                 pdb[asn] = []
-                
+
             if v4:
                 pdb[asn].append(v4)
             if v6:
                 pdb[asn].append(v6)
-                
+
             processed_count += 1
-                
+
             # Periodic garbage collection to keep memory usage low
             if processed_count % 10000 == 0:
                 print(f"Processed {processed_count} PeeringDB connections, current memory usage for {len(pdb)} ASNs", file=sys.stderr)
                 gc.collect()
-                
+
     except Exception as e:
-        print(f"Error processing PeeringDB netixlan data: {e}", file=sys.stderr) 
+        print(f"Error processing PeeringDB netixlan data: {e}", file=sys.stderr)
         raise PeeringDBError(f"Failed to process PeeringDB netixlan data: {e}")
-        
+
     print(f"Completed processing {processed_count} PeeringDB connections for {len(pdb)} ASNs", file=sys.stderr)
     return pdb
 
@@ -357,12 +357,12 @@ def memory_efficient_pdb_processing(pdb_auth: Dict) -> Dict[int, List[str]]:
 def memory_efficient_max_prefixes_processing(pdb_auth: Dict) -> Dict[str, Dict[str, int]]:
     """Process PeeringDB network data with memory-efficient streaming"""
     print("Processing PeeringDB network data with memory-efficient streaming...", file=sys.stderr)
-    
+
     max_prefixes = {}
     processed_count = 0
-    
+
     try:
-        # Use pagination for network data  
+        # Use pagination for network data
         for netdata in paginated_peeringdb_request(
             "https://www.peeringdb.com/api/net",
             pdb_auth,
@@ -371,36 +371,36 @@ def memory_efficient_max_prefixes_processing(pdb_auth: Dict) -> Dict[str, Dict[s
             asn_num = netdata.get("asn")
             if asn_num is None:
                 continue
-                
+
             asn = f"AS{asn_num}"
             if asn not in max_prefixes:
                 max_prefixes[asn] = {}
-                
+
             # Process IPv4 prefix limits
             maxprefixes_v4 = netdata.get("info_prefixes4")
             if maxprefixes_v4 is None or maxprefixes_v4 < 100:
                 max_prefixes[asn]["v4"] = 100
             else:
                 max_prefixes[asn]["v4"] = int(maxprefixes_v4 * 1.1)
-                
+
             # Process IPv6 prefix limits
             maxprefixes_v6 = netdata.get("info_prefixes6")
             if maxprefixes_v6 is None or maxprefixes_v6 < 100:
                 max_prefixes[asn]["v6"] = 100
             else:
                 max_prefixes[asn]["v6"] = int(maxprefixes_v6 * 1.1)
-                
+
             processed_count += 1
-            
+
             # Periodic garbage collection
             if processed_count % 5000 == 0:
                 print(f"Processed {processed_count} networks, tracking prefix limits for {len(max_prefixes)} ASNs", file=sys.stderr)
                 gc.collect()
-                
+
     except Exception as e:
         print(f"Error processing PeeringDB network data: {e}", file=sys.stderr)
         raise PeeringDBError(f"Failed to process PeeringDB network data: {e}")
-        
+
     print(f"Completed processing {processed_count} networks with prefix limits for {len(max_prefixes)} ASNs", file=sys.stderr)
     return max_prefixes
 
@@ -415,17 +415,17 @@ PEERINGDB_MIRRORS = [
 def resilient_peeringdb_request(endpoint: str, headers: Dict, fallback_cache_file: str = None) -> Dict:
     """Make PeeringDB API request with fallback mechanisms"""
     last_error = None
-    
+
     for mirror_base in PEERINGDB_MIRRORS:
         mirror_url = f"{mirror_base}/{endpoint.lstrip('/')}"
-        
+
         try:
             print(f"Attempting to fetch from {mirror_url}", file=sys.stderr)
-            
+
             # Try the mirror
-            data_str = download(mirror_url, headers)  
+            data_str = download(mirror_url, headers)
             data = json.loads(data_str)
-            
+
             # Cache successful response if cache file specified
             if fallback_cache_file:
                 try:
@@ -435,41 +435,41 @@ def resilient_peeringdb_request(endpoint: str, headers: Dict, fallback_cache_fil
                     print(f"Cached response to {fallback_cache_file}.gz", file=sys.stderr)
                 except Exception as cache_error:
                     print(f"WARNING: Failed to cache response: {cache_error}", file=sys.stderr)
-            
+
             return data
-            
+
         except Exception as e:
             print(f"Mirror {mirror_url} failed: {e}", file=sys.stderr)
             last_error = e
             continue
-    
+
     # All mirrors failed, try fallback cache
     if fallback_cache_file:
         cache_files = [f"{fallback_cache_file}.gz", fallback_cache_file]
-        
+
         for cache_file in cache_files:
             if os.path.exists(cache_file):
                 try:
                     print(f"All PeeringDB mirrors failed, using cached data from {cache_file}", file=sys.stderr)
-                    
+
                     if cache_file.endswith('.gz'):
                         with gzip.open(cache_file, 'rt', encoding='utf-8') as f:
                             data = json.load(f)
                     else:
                         with open(cache_file, 'r', encoding='utf-8') as f:
                             data = json.load(f)
-                    
+
                     # Check cache age and warn if old
                     cache_age = time.time() - os.path.getmtime(cache_file)
                     if cache_age > 24 * 3600:  # Older than 24 hours
                         print(f"WARNING: Using cached data that is {cache_age/3600:.1f} hours old", file=sys.stderr)
-                    
+
                     return data
-                    
+
                 except Exception as cache_error:
                     print(f"Failed to read cache file {cache_file}: {cache_error}", file=sys.stderr)
                     continue
-    
+
     # All options exhausted
     raise PeeringDBError(f"All PeeringDB mirrors failed and no valid cache available. Last error: {last_error}")
 
@@ -608,17 +608,17 @@ try:
     # Load configuration with new architecture
     config_manager = get_config_manager()
     config = config_manager.load_configuration()
-    
+
     # Initialize plugin system
     plugin_manager = initialize_plugin_system(config)
-    
+
     # Initialize state manager
     state_manager = get_state_manager(config=config)
-    
+
     # Track generation start
     generation_start_time = time.time()
     start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
-    
+
     track_event(
         EventType.GENERATION_START,
         "peering_filters",
@@ -630,9 +630,9 @@ try:
             "memory_start_mb": start_memory
         }
     )
-    
+
     print(f"✓ Initialized new architecture - Config Manager, Plugin System, State Manager", file=sys.stderr)
-    
+
 except Exception as e:
     print(f"WARNING: Failed to initialize new architecture: {e}", file=sys.stderr)
     print("Falling back to legacy mode", file=sys.stderr)
@@ -1051,17 +1051,17 @@ try:
     # Load configuration with new architecture
     config_manager = get_config_manager()
     config = config_manager.load_configuration()
-    
+
     # Initialize plugin system
     plugin_manager = initialize_plugin_system(config)
-    
+
     # Initialize state manager
     state_manager = get_state_manager(config=config)
-    
+
     # Track generation start
     generation_start_time = time.time()
     start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
-    
+
     track_event(
         EventType.GENERATION_START,
         "peering_filters",
@@ -1073,9 +1073,9 @@ try:
             "memory_start_mb": start_memory
         }
     )
-    
+
     print(f"Initialized new architecture - Config Manager, Plugin System, State Manager", file=sys.stderr)
-    
+
 except Exception as e:
     print(f"WARNING: Failed to initialize new architecture: {e}", file=sys.stderr)
     print("Falling back to legacy mode", file=sys.stderr)
@@ -1088,14 +1088,14 @@ for asn in peerings:
     if not validate_asn(asn):
         print(f"ERROR: Invalid ASN format: {asn}", file=sys.stderr)
         continue
-    
+
     # Validate AS-SET in import field
     if "import" in peerings[asn] and peerings[asn]["import"] != "ANY":
         for as_set in peerings[asn]["import"].split():
             if not validate_as_set(as_set) and not validate_asn(as_set):
                 print(f"ERROR: Invalid AS-SET or ASN format in import for {asn}: {as_set}", file=sys.stderr)
                 continue
-    
+
     sessions = []
     if "only_with" in peerings[asn]:
         sessions = peerings[asn]["only_with"]
@@ -1118,7 +1118,7 @@ for asn in peerings:
         if not validate_ip_address(session):
             print(f"ERROR: Invalid session IP address for {asn}: {session}", file=sys.stderr)
             continue
-        
+
         try:
             session_ip = ipaddress.ip_address(session)
         except (ValueError, TypeError) as e:
@@ -1296,11 +1296,11 @@ if state_manager:
         end_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
         peak_memory = max(start_memory, end_memory)
         generation_duration_ms = int((generation_end_time - generation_start_time) * 1000)
-        
+
         # Count total filters and peers processed
         peer_count = len(peerings)
         filter_count = len(seen_router_policy) if 'seen_router_policy' in locals() else 0
-        
+
         # Create generation record
         generation_record = GenerationRecord(
             config_hash=sha256(str(peerings).encode()).hexdigest()[:16],
@@ -1317,17 +1317,17 @@ if state_manager:
                 "memory_end_mb": end_memory,
                 "processed_asns": peer_count,
                 "total_sessions": sum(len(sessions) for sessions in [
-                    peerings[asn].get("only_with", []) or 
-                    peerings[asn].get("private_peerings", []) or 
+                    peerings[asn].get("only_with", []) or
+                    peerings[asn].get("private_peerings", []) or
                     pdb.get(int(asn[2:]), []) for asn in peerings
                 ] if sessions),
                 "plugins_loaded": len(plugin_manager.plugins) if plugin_manager else 0
             }
         )
-        
+
         # Track the generation
         generation_id = state_manager.track_generation(generation_record)
-        
+
         # Track completion event
         track_event(
             EventType.GENERATION_SUCCESS,
@@ -1344,15 +1344,15 @@ if state_manager:
             },
             duration_ms=generation_duration_ms
         )
-        
+
         print(f"✓ Generation completed - ID: {generation_id}, Duration: {generation_duration_ms/1000:.1f}s, Peak Memory: {peak_memory:.1f}MB", file=sys.stderr)
-        
+
     except Exception as e:
         print(f"ERROR: Failed to track generation completion: {e}", file=sys.stderr)
         if 'track_event' in locals():
             track_event(
                 EventType.GENERATION_FAILURE,
-                "peering_filters", 
+                "peering_filters",
                 f"Failed to track generation: {e}",
                 success=False
             )
