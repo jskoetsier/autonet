@@ -16,3 +16,13 @@ ruff>=0.1.0,<1.0.0  # Fast Python linter
 
 # Security and cryptography
 cryptography>=41.0.0,<42.0.0  # For API key encryption
+
+# Schema validation and configuration management
+jsonschema>=4.17.0,<5.0.0  # For configuration schema validation
+
+# Database support for state management
+# SQLite is included in Python standard library
+# For PostgreSQL support (optional):
+# psycopg2-binary>=2.9.0,<3.0.0
+# For MySQL support (optional):
+# PyMySQL>=1.0.0,<2.0.0

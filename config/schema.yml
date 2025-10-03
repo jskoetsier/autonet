@@ -1,0 +1,446 @@
+---
+# AutoNet Configuration Schema v2.0
+# This file defines the validation schema for all AutoNet configuration files
+
+autonet:
+  version: "2.0"
+  schema_version: "1.0"
+  
+  # Core validation rules
+  validation:
+    strict_mode: true
+    fail_on_warnings: false
+    schema_validation: true
+    
+    # Required configuration sections
+    required_sections:
+      - "builddir"
+      - "stagedir" 
+      - "peerings_url"
+      - "ixp_map"
+      - "bgp"
+    
+    # Optional sections with defaults
+    optional_sections:
+      pdb_apikey: null
+      irr_source_host: "rr.ntt.net"
+      irr_order: "NTTCOM,INTERNAL,RADB,RIPE"
+      process: {}
+      rpki: {}
+      
+  # Security configuration
+  security:
+    # API key encryption settings
+    encrypt_api_keys: true
+    key_rotation_days: 90
+    allowed_encryption_methods:
+      - "fernet"
+      - "environment"
+    
+    # Input validation rules
+    validation_rules:
+      asn_format: "^AS\\d+$"
+      ip_address_validation: true
+      as_set_format: "^(AS\\d+:)?AS-[A-Z0-9\\-]+$"
+      router_name_format: "^[a-zA-Z0-9.-]+$"
+    
+    # SSH security settings
+    ssh:
+      strict_host_key_checking: true
+      key_permissions: [400, 600]
+      connection_timeout: 30
+      max_retries: 3
+  
+  # Performance configuration
+  performance:
+    # Memory management
+    memory:
+      stream_processing: true
+      chunk_size: 8192
+      page_size: 2000
+      gc_frequency: 10000
+      max_memory_mb: 512
+    
+    # Network optimization
+    network:
+      connection_pool: true
+      max_connections: 10
+      timeout:
+        connect: 10
+        read: 30
+        total: 60
+      retry_backoff_factor: 2
+      max_retries: 3
+    
+    # Parallel processing
+    concurrency:
+      max_workers: 20
+      worker_scaling: "auto"  # auto, fixed, adaptive
+      cpu_multiplier: 2
+  
+  # API configuration
+  api:
+    peeringdb:
+      base_urls:
+        - "https://www.peeringdb.com/api"
+        - "https://peeringdb.org/api"
+      cache:
+        enabled: true
+        ttl_seconds: 86400  # 24 hours
+        max_size_mb: 100
+        compression: true
+        directory: "/var/cache/autonet"
+      rate_limiting:
+        requests_per_minute: 100
+        burst_size: 10
+  
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    structured: true
+    format: "json"  # json, text
+    outputs:
+      - "stdout"
+      - "/var/log/autonet/autonet.log"
+    rotation:
+      max_size_mb: 100
+      backup_count: 5
+  
+  # Plugin system configuration
+  plugins:
+    enabled: true
+    auto_discovery: true
+    directories:
+      - "plugins"
+      - "/etc/autonet/plugins"
+      - "/usr/local/lib/autonet/plugins"
+    
+    # Vendor plugins
+    vendors:
+      bird:
+        class: "BirdVendorPlugin"
+        module: "plugins.vendors.bird"
+        enabled: true
+        config:
+          bird_bin: "/usr/sbin/bird"
+          bird6_bin: "/usr/sbin/bird"
+          birdc_bin: "/usr/sbin/birdc"
+          birdc6_bin: "/usr/local/bin/birdc6"
+      
+      bird2:
+        class: "Bird2VendorPlugin" 
+        module: "plugins.vendors.bird2"
+        enabled: false
+        config:
+          bird_bin: "/usr/sbin/bird"
+          birdc_bin: "/usr/sbin/birdc"
+  
+  # State management configuration
+  state:
+    backend: "sqlite"  # sqlite, postgresql, mysql
+    database:
+      path: "/var/lib/autonet/state.db"
+      # For PostgreSQL/MySQL:
+      # host: "localhost"
+      # port: 5432
+      # username: "autonet"
+      # password: "encrypted_password"
+      # database: "autonet"
+    
+    retention:
+      generations: 100      # Keep last 100 generations
+      days: 30              # Keep data for 30 days
+      cleanup_frequency: "daily"
+    
+    events:
+      track_generations: true
+      track_deployments: true
+      track_errors: true
+      track_performance: true
+
+# Schema definitions for validation
+schemas:
+  
+  # Generic configuration schema
+  generic_config:
+    type: "object"
+    required:
+      - "builddir"
+      - "stagedir"
+      - "peerings_url"
+      - "ixp_map"
+      - "bgp"
+    properties:
+      builddir:
+        type: "string"
+        pattern: "^/[a-zA-Z0-9/_-]+$"
+        description: "Build directory path"
+      
+      stagedir:
+        type: "string"
+        pattern: "^/[a-zA-Z0-9/_-]+$"
+        description: "Staging directory path"
+      
+      peerings_url:
+        type: "string"
+        format: "uri"
+        description: "URL to peerings configuration"
+      
+      pdb_apikey:
+        type: "string"
+        pattern: "^(ENCRYPTED:[A-Za-z0-9+/=]+|[a-f0-9]{32,})$"
+        description: "PeeringDB API key (encrypted or plaintext)"
+      
+      irr_source_host:
+        type: "string"
+        format: "hostname"
+        description: "IRR source hostname"
+      
+      irr_order:
+        type: "string"
+        pattern: "^[A-Z0-9,_-]+$"
+        description: "IRR source order"
+      
+      ixp_map:
+        type: "object"
+        patternProperties:
+          "^[a-z0-9-]+$":
+            type: "object"
+            required:
+              - "ipv4_range"
+              - "ipv6_range"
+              - "present_on"
+            properties:
+              ixp_community:
+                type: "integer"
+                minimum: 1
+                maximum: 65535
+              ipv4_range:
+                type: "string"
+                format: "ipv4_cidr"
+              ipv6_range:
+                type: "string"
+                format: "ipv6_cidr"
+              present_on:
+                type: "array"
+                items:
+                  type: "string"
+                  format: "hostname"
+              bgp_local_pref:
+                type: "integer"
+                minimum: 0
+                maximum: 4294967295
+      
+      bgp:
+        type: "object"
+        patternProperties:
+          "^[a-z0-9-]+$":
+            type: "object"
+            required:
+              - "fqdn"
+              - "ipv4"
+              - "ipv6"
+              - "vendor"
+            properties:
+              fqdn:
+                type: "string"
+                format: "hostname"
+              ipv4:
+                type: "string"
+                format: "ipv4"
+              ipv6:
+                type: "string"
+                format: "ipv6"
+              vendor:
+                type: "string"
+                enum: ["bird", "bird2", "frr", "cisco", "juniper"]
+              graceful_shutdown:
+                type: "boolean"
+                default: false
+              maintenance_mode:
+                type: "boolean"
+                default: false
+      
+      rpki:
+        type: "object"
+        properties:
+          validation:
+            type: "boolean"
+            default: true
+          whitelist:
+            type: "object"
+            properties:
+              ipv4:
+                type: "array"
+                items:
+                  type: "string"
+                  format: "ipv4_cidr"
+              ipv6:
+                type: "array"
+                items:
+                  type: "string"
+                  format: "ipv6_cidr"
+  
+  # Router-specific configuration schema
+  router_config:
+    type: "object"
+    required:
+      - "hostname"
+      - "shortname"
+      - "router_id"
+    properties:
+      hostname:
+        type: "string"
+        format: "hostname"
+      shortname:
+        type: "string"
+        pattern: "^[a-z0-9-]+$"
+        maxLength: 16
+      router_id:
+        type: "string"
+        format: "ipv4"
+      
+      interfaces:
+        type: "object"
+        properties:
+          backbone:
+            type: "array"
+            items:
+              type: "object"
+              required: ["nic"]
+              properties:
+                nic:
+                  type: "string"
+                  pattern: "^[a-zA-Z0-9.-]+$"
+                cost:
+                  type: "integer"
+                  minimum: 1
+                  maximum: 65535
+                  default: 100
+                maintenance:
+                  type: "boolean"
+                  default: false
+                bfd:
+                  type: "boolean"
+                  default: false
+          
+          external:
+            type: "array"
+            items:
+              type: "object"
+              required: ["nic"]
+              properties:
+                nic:
+                  type: "string"
+                  pattern: "^[a-zA-Z0-9.-]+$"
+      
+      members_bgp_source:
+        type: "object"
+        properties:
+          default:
+            type: "object"
+            required: ["ipv4", "ipv6"]
+            properties:
+              ipv4:
+                type: "string"
+                format: "ipv4"
+              ipv6:
+                type: "string"
+                format: "ipv6"
+
+# Validation rules and constraints
+validation_rules:
+  
+  # File validation
+  files:
+    max_size_mb: 10
+    allowed_extensions: [".yml", ".yaml"]
+    encoding: "utf-8"
+  
+  # Network validation
+  network:
+    asn_range:
+      min: 1
+      max: 4294967295
+      exclude_private: false  # Allow private ASNs for testing
+    
+    ip_validation:
+      strict_rfc: true
+      allow_private: true
+      allow_loopback: false
+      allow_multicast: false
+  
+  # String validation
+  strings:
+    hostname:
+      max_length: 253
+      allow_underscores: false
+    
+    asn:
+      case_insensitive: true
+      require_as_prefix: true
+    
+    as_set:
+      case_insensitive: true
+      max_nesting_levels: 3
+
+# Error handling configuration
+error_handling:
+  validation_errors:
+    fail_fast: false
+    collect_all_errors: true
+    detailed_messages: true
+  
+  recovery_strategies:
+    missing_optional_fields: "use_defaults"
+    invalid_format: "skip_with_warning"
+    network_errors: "retry_with_backoff"
+  
+  exit_codes:
+    success: 0
+    config_error: 1
+    validation_error: 4
+    network_error: 5
+    permission_error: 6
+
+# Environment-specific overrides
+environments:
+  development:
+    logging:
+      level: "DEBUG"
+    validation:
+      strict_mode: false
+      fail_on_warnings: false
+    security:
+      encrypt_api_keys: false
+  
+  staging:
+    logging:
+      level: "INFO"
+    validation:
+      strict_mode: true
+      fail_on_warnings: true
+    api:
+      peeringdb:
+        cache:
+          ttl_seconds: 3600  # 1 hour for faster testing
+  
+  production:
+    logging:
+      level: "WARNING"
+    validation:
+      strict_mode: true
+      fail_on_warnings: true
+    security:
+      encrypt_api_keys: true
+    api:
+      peeringdb:
+        cache:
+          ttl_seconds: 86400  # 24 hours
+
+# Migration settings for schema updates
+migration:
+  auto_migrate: true
+  backup_before_migration: true
+  migration_timeout_seconds: 300
+  rollback_on_failure: true

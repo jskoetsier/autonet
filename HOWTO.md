@@ -975,6 +975,178 @@ except Exception as e:
     send_slack_notification("ERROR", f"Deployment failed: {e}")
 ```
 
+## New Architecture (v2.0)
+
+### Architecture Overview
+
+AutoNet v2.0 introduces a modern, extensible architecture with three core components:
+
+1. **Configuration Management System** - Centralized configuration with schema validation
+2. **Plugin Architecture** - Extensible vendor and feature plugins
+3. **State Management** - Database-backed event tracking and performance monitoring
+
+#### Configuration Management
+
+The new configuration system provides:
+- **Schema Validation**: JSON Schema-based validation for all configuration files
+- **Environment Overrides**: Environment-specific configuration (development, staging, production)
+- **Secure API Keys**: Encrypted storage with environment variable fallback
+- **Hierarchical Configuration**: Base + router-specific configuration inheritance
+
+```python
+# Using the new configuration system
+from lib.config_manager import get_config_manager
+
+# Load configuration with validation
+config_manager = get_config_manager()
+config = config_manager.load_configuration()
+
+# Get router-specific configuration
+router_config = config_manager.get_router_config("router1.example.net", config)
+```
+
+#### Plugin Architecture
+
+The plugin system enables:
+- **Vendor Plugins**: Support for multiple routing vendors (BIRD, BIRD2, FRR, etc.)
+- **Filter Plugins**: Custom prefix filtering implementations
+- **Validator Plugins**: Custom validation rules
+- **Auto-Discovery**: Automatic plugin loading from configured directories
+
+```python
+# Using the plugin system
+from lib.plugin_system import initialize_plugin_system, get_plugin_manager
+
+# Initialize plugins
+plugin_manager = initialize_plugin_system(config)
+
+# Get vendor-specific plugin
+bird2_plugin = plugin_manager.get_vendor_plugin("bird2")
+if bird2_plugin:
+    config_text = bird2_plugin.generate_config(peer_info, template_vars)
+```
+
+#### State Management
+
+The state management system provides:
+- **Event Tracking**: Comprehensive logging of all system events
+- **Generation History**: Track configuration generation performance and metrics
+- **Deployment Tracking**: Monitor deployment success/failure across routers
+- **Performance Analytics**: Historical performance data and trends
+
+```python
+# Using the state management system
+from lib.state_manager import get_state_manager, track_event, EventType
+
+# Track events
+track_event(EventType.GENERATION_START, "peering_filters", "Starting generation")
+
+# Get performance statistics
+state_manager = get_state_manager()
+stats = state_manager.get_performance_stats(days=7)
+```
+
+### Configuration Schema
+
+The configuration schema (`config/schema.yml`) defines:
+
+```yaml
+autonet:
+  version: "2.0"
+  
+  # Security settings
+  security:
+    encrypt_api_keys: true
+    validation_rules:
+      asn_format: "^AS\\d+$"
+      ip_address_validation: true
+  
+  # Performance settings
+  performance:
+    memory:
+      stream_processing: true
+      chunk_size: 8192
+    network:
+      max_retries: 3
+      timeout: 30
+  
+  # Plugin configuration
+  plugins:
+    enabled: true
+    vendors:
+      bird2:
+        class: "Bird2VendorPlugin"
+        enabled: true
+```
+
+### Using the New Architecture
+
+#### 1. Configuration Setup
+
+```bash
+# Create configuration directories
+mkdir -p config vars
+
+# Copy and customize schema
+cp config/schema.yml config/schema.yml.custom
+
+# Set environment variables
+export AUTONET_ENV="production"
+export AUTONET_PEERINGDB_KEY="your-api-key"
+```
+
+#### 2. Plugin Development
+
+Create custom vendor plugin:
+
+```python
+# plugins/vendors/custom_vendor.py
+from lib.plugin_system import VendorPlugin, PluginInfo, PluginType
+
+class CustomVendorPlugin(VendorPlugin):
+    def get_info(self):
+        return PluginInfo(
+            name="custom_vendor",
+            version="1.0.0",
+            description="Custom vendor support",
+            plugin_type=PluginType.VENDOR,
+            # ... other fields
+        )
+    
+    def generate_config(self, peer_info, template_vars):
+        # Custom configuration generation logic
+        pass
+```
+
+#### 3. State Monitoring
+
+```bash
+# View recent events
+python3 -m lib.state_manager --events 50
+
+# Show performance statistics
+python3 -m lib.state_manager --stats 7
+
+# Export data for analysis
+python3 -m lib.state_manager --export performance_data.json
+```
+
+### Migration from v1.x
+
+The new architecture is backward compatible. Legacy configurations continue to work while new features are gradually adopted:
+
+1. **Phase 1**: New architecture initializes alongside legacy code
+2. **Phase 2**: Gradual migration of functionality to new components  
+3. **Phase 3**: Full migration with legacy compatibility layer
+
+### Architecture Benefits
+
+- **🔧 Maintainability**: Modular design with clear separation of concerns
+- **🚀 Extensibility**: Plugin system for easy vendor and feature additions
+- **📊 Observability**: Comprehensive tracking and monitoring
+- **🛡️ Reliability**: Better error handling and state management
+- **⚡ Performance**: Optimized configuration loading and processing
+
 ## Development
 
 ### Development Setup

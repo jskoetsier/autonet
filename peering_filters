@@ -9,6 +9,7 @@
     (c) 2017-2023 Network Operators <routers@example.net>
 
 """
+#!/usr/bin/env python3
 
 import ipaddress
 import json
@@ -20,12 +21,14 @@ import fcntl
 import shlex
 import gc
 import gzip
+import psutil
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from hashlib import sha256
 from subprocess import PIPE, Popen
 from typing import List, Dict, Optional, Union, Iterator, Generator
 from pathlib import Path
 from io import StringIO
+from datetime import datetime
 
 import requests
 import yaml
@@ -33,6 +36,15 @@ from jinja2 import Environment, FileSystemLoader
 from numpy import base_repr
 from cryptography.fernet import Fernet
 import base64
+
+# Import new architecture components
+from lib.config_manager import get_config_manager, ConfigurationManager
+from lib.plugin_system import get_plugin_manager, initialize_plugin_system, PluginType
+from lib.state_manager import (
+    get_state_manager, StateManager, StateEvent, GenerationRecord, 
+    EventType, track_event
+                          )
+
 
 
 # Custom exception classes for better error handling
@@ -591,6 +603,45 @@ if "--no-checks" in sys.argv:
 if "debug" in sys.argv:
     debugmode = True
 
+# Initialize new architecture
+try:
+    # Load configuration with new architecture
+    config_manager = get_config_manager()
+    config = config_manager.load_configuration()
+    
+    # Initialize plugin system
+    plugin_manager = initialize_plugin_system(config)
+    
+    # Initialize state manager
+    state_manager = get_state_manager(config=config)
+    
+    # Track generation start
+    generation_start_time = time.time()
+    start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+    
+    track_event(
+        EventType.GENERATION_START,
+        "peering_filters",
+        f"Starting configuration generation with new architecture",
+        details={
+            "total_peers": len(peerings) if 'peerings' in locals() else 0,
+            "generate_configs": generate_configs,
+            "generate_prefixsets": generate_prefixsets,
+            "memory_start_mb": start_memory
+        }
+    )
+    
+    print(f"✓ Initialized new architecture - Config Manager, Plugin System, State Manager", file=sys.stderr)
+    
+except Exception as e:
+    print(f"WARNING: Failed to initialize new architecture: {e}", file=sys.stderr)
+    print("Falling back to legacy mode", file=sys.stderr)
+    config_manager = None
+    plugin_manager = None
+    state_manager = None
+    generation_start_time = time.time()
+    start_memory = 0.0
+
 
 # For testing purposes, allow a local file as peering manifest
 if "PEERINGS_FILE" in os.environ:
@@ -995,6 +1046,43 @@ with ProcessPoolExecutor(max_workers=10) as executor:
             print(f"Error processing ASN: {e}")
 
 
+# Initialize new architecture
+try:
+    # Load configuration with new architecture
+    config_manager = get_config_manager()
+    config = config_manager.load_configuration()
+    
+    # Initialize plugin system
+    plugin_manager = initialize_plugin_system(config)
+    
+    # Initialize state manager
+    state_manager = get_state_manager(config=config)
+    
+    # Track generation start
+    generation_start_time = time.time()
+    start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+    
+    track_event(
+        EventType.GENERATION_START,
+        "peering_filters",
+        f"Starting configuration generation with new architecture",
+        details={
+            "total_peers": len(peerings),
+            "generate_configs": generate_configs,
+            "generate_prefixsets": generate_prefixsets,
+            "memory_start_mb": start_memory
+        }
+    )
+    
+    print(f"Initialized new architecture - Config Manager, Plugin System, State Manager", file=sys.stderr)
+    
+except Exception as e:
+    print(f"WARNING: Failed to initialize new architecture: {e}", file=sys.stderr)
+    print("Falling back to legacy mode", file=sys.stderr)
+    config_manager = None
+    plugin_manager = None
+    state_manager = None
+
 for asn in peerings:
     # Validate ASN format
     if not validate_asn(asn):
@@ -1199,3 +1287,72 @@ for asn in peerings:
                             blackhole_accept,
                             blackhole_community,
                         )
+
+# Complete generation tracking with new architecture
+if state_manager:
+    try:
+        # Calculate final metrics
+        generation_end_time = time.time()
+        end_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+        peak_memory = max(start_memory, end_memory)
+        generation_duration_ms = int((generation_end_time - generation_start_time) * 1000)
+        
+        # Count total filters and peers processed
+        peer_count = len(peerings)
+        filter_count = len(seen_router_policy) if 'seen_router_policy' in locals() else 0
+        
+        # Create generation record
+        generation_record = GenerationRecord(
+            config_hash=sha256(str(peerings).encode()).hexdigest()[:16],
+            peer_count=peer_count,
+            filter_count=filter_count,
+            duration_ms=generation_duration_ms,
+            memory_peak_mb=peak_memory,
+            success=True,
+            metadata={
+                "generate_configs": generate_configs,
+                "generate_prefixsets": generate_prefixsets,
+                "architecture_version": "2.0",
+                "memory_start_mb": start_memory,
+                "memory_end_mb": end_memory,
+                "processed_asns": peer_count,
+                "total_sessions": sum(len(sessions) for sessions in [
+                    peerings[asn].get("only_with", []) or 
+                    peerings[asn].get("private_peerings", []) or 
+                    pdb.get(int(asn[2:]), []) for asn in peerings
+                ] if sessions),
+                "plugins_loaded": len(plugin_manager.plugins) if plugin_manager else 0
+            }
+        )
+        
+        # Track the generation
+        generation_id = state_manager.track_generation(generation_record)
+        
+        # Track completion event
+        track_event(
+            EventType.GENERATION_SUCCESS,
+            "peering_filters",
+            f"Configuration generation completed successfully",
+            details={
+                "generation_id": generation_id,
+                "peer_count": peer_count,
+                "filter_count": filter_count,
+                "duration_ms": generation_duration_ms,
+                "memory_peak_mb": peak_memory,
+                "memory_efficiency": f"{((start_memory - end_memory) / start_memory * 100):.1f}% reduction" if start_memory > end_memory else "memory stable",
+                "architecture_version": "2.0"
+            },
+            duration_ms=generation_duration_ms
+        )
+        
+        print(f"✓ Generation completed - ID: {generation_id}, Duration: {generation_duration_ms/1000:.1f}s, Peak Memory: {peak_memory:.1f}MB", file=sys.stderr)
+        
+    except Exception as e:
+        print(f"ERROR: Failed to track generation completion: {e}", file=sys.stderr)
+        if 'track_event' in locals():
+            track_event(
+                EventType.GENERATION_FAILURE,
+                "peering_filters", 
+                f"Failed to track generation: {e}",
+                success=False
+            )
