@@ -1,0 +1,321 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - AutoNet{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<!-- Status Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card card-stat text-white bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Active Routers</h6>
+                        <h2 class="mb-0">{{ active_routers }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-router fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card card-stat text-white bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Routers</h6>
+                        <h2 class="mb-0">{{ total_routers }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-diagram-3 fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card card-stat text-white bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Pending Deployments</h6>
+                        <h2 class="mb-0">{{ pending_deployments }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-upload fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card card-stat text-white bg-danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Recent Errors</h6>
+                        <h2 class="mb-0">{{ recent_errors }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-exclamation-triangle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightning"></i> Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="btn-group me-2" role="group">
+                    <button type="button" class="btn btn-primary" onclick="generateConfigs()">
+                        <i class="bi bi-gear"></i> Generate All Configs
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="deployAll()">
+                        <i class="bi bi-upload"></i> Deploy to All Routers
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="validateConfigs()">
+                        <i class="bi bi-check-circle"></i> Validate Configs
+                    </button>
+                </div>
+                
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-secondary" onclick="syncRouters()">
+                        <i class="bi bi-arrow-clockwise"></i> Sync Routers
+                    </button>
+                    <a href="{% url 'monitoring:events' %}" class="btn btn-outline-info">
+                        <i class="bi bi-activity"></i> View Events
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Row -->
+<div class="row">
+    <!-- Recent Events -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Recent Events
+                </h5>
+                <a href="{% url 'monitoring:events' %}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_events %}
+                    <div class="list-group list-group-flush">
+                        {% for event in recent_events %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    <div class="event-icon">
+                                        {% if event.success %}
+                                            <i class="bi bi-check-circle text-success"></i>
+                                        {% elif event.is_error %}
+                                            <i class="bi bi-x-circle text-danger"></i>
+                                        {% elif event.is_warning %}
+                                            <i class="bi bi-exclamation-triangle text-warning"></i>
+                                        {% else %}
+                                            <i class="bi bi-info-circle text-info"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="ms-2">
+                                        <h6 class="mb-1">{{ event.message|truncatechars:60 }}</h6>
+                                        <small class="text-muted">{{ event.component }}</small>
+                                        {% if event.router %}
+                                            <small class="text-muted"> • {{ event.router.name }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <small class="text-muted">{{ event.timestamp|timesince }} ago</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        <p>No recent events to display</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Statistics -->
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-up"></i> System Health
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small>Router Health</small>
+                        <small>{{ active_routers }}/{{ total_routers }}</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {% if total_routers > 0 %}{% widthratio active_routers total_routers 100 %}{% else %}0{% endif %}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small>Deployment Success</small>
+                        <small>95%</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: 95%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small>Error Rate</small>
+                        <small>5%</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: 5%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Activity Chart -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-bar-chart"></i> Activity (7 days)
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="activityChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Router Status Grid -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-router"></i> Router Status
+                </h5>
+                <a href="{% url 'routers:list' %}" class="btn btn-sm btn-outline-primary">
+                    Manage Routers
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for router in status.routers|slice:":8" %}
+                    <div class="col-md-3 mb-3">
+                        <div class="card border">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center">
+                                    <span class="status-indicator status-{{ router.status }}"></span>
+                                    <div>
+                                        <h6 class="mb-0">{{ router.name }}</h6>
+                                        <small class="text-muted">{{ router.vendor|title }}</small>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted d-block">{{ router.fqdn }}</small>
+                                    {% if router.last_deployment %}
+                                        <small class="text-muted">Last deploy: {{ router.last_deployment|timesince }} ago</small>
+                                    {% else %}
+                                        <small class="text-warning">Never deployed</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12">
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-router fs-1 d-block mb-2"></i>
+                            <p>No routers configured</p>
+                            <button class="btn btn-primary" onclick="syncRouters()">
+                                <i class="bi bi-arrow-clockwise"></i> Sync Routers from Config
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Activity Chart
+    const ctx = document.getElementById('activityChart').getContext('2d');
+    const dailyStats = {{ daily_stats|safe }};
+    
+    const dates = Object.keys(dailyStats).reverse();
+    const totals = dates.map(date => dailyStats[date].total);
+    const errors = dates.map(date => dailyStats[date].errors);
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates.map(date => new Date(date).toLocaleDateString()),
+            datasets: [{
+                label: 'Total Events',
+                data: totals,
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.1
+            }, {
+                label: 'Errors',
+                data: errors,
+                borderColor: '#dc3545',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

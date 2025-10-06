@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AutoNet - Network Automation{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom CSS -->
+    <style>
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .status-error { background-color: #ffc107; }
+        .status-unknown { background-color: #6c757d; }
+        .status-deploying { background-color: #17a2b8; }
+        
+        .card-stat {
+            transition: transform 0.2s;
+        }
+        .card-stat:hover {
+            transform: translateY(-2px);
+        }
+        
+        .event-icon {
+            width: 24px;
+            text-align: center;
+        }
+        
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1050;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'dashboard:index' %}">
+                <i class="bi bi-router"></i> AutoNet
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}" 
+                           href="{% url 'dashboard:index' %}">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.app_name == 'routers' %}active{% endif %}" 
+                           href="{% url 'routers:list' %}">
+                            <i class="bi bi-router"></i> Routers
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.app_name == 'configurations' %}active{% endif %}" 
+                           href="{% url 'configurations:list' %}">
+                            <i class="bi bi-file-earmark-code"></i> Configurations
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.app_name == 'deployments' %}active{% endif %}" 
+                           href="{% url 'deployments:list' %}">
+                            <i class="bi bi-upload"></i> Deployments
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.app_name == 'monitoring' %}active{% endif %}" 
+                           href="{% url 'monitoring:events' %}">
+                            <i class="bi bi-activity"></i> Monitoring
+                        </a>
+                    </li>
+                </ul>
+                
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-gear"></i> Settings
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="syncRouters()">
+                                <i class="bi bi-arrow-clockwise"></i> Sync Routers
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/admin/">
+                                <i class="bi bi-shield-lock"></i> Admin
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Messages -->
+        {% if messages %}
+            <div class="row">
+                <div class="col-12">
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Toast container for notifications -->
+    <div class="toast-container"></div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- CSRF Token -->
+    <script>
+        // Get CSRF token for AJAX requests
+        function getCSRFToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
+    </script>
+    
+    <!-- AutoNet JS -->
+    <script>
+        class AutoNetUI {
+            constructor() {
+                this.bindEvents();
+            }
+
+            showToast(message, type = 'info') {
+                const toastContainer = document.querySelector('.toast-container');
+                const toastId = 'toast-' + Date.now();
+                
+                const toastHTML = `
+                    <div id="${toastId}" class="toast" role="alert">
+                        <div class="toast-header">
+                            <i class="bi bi-${type === 'success' ? 'check-circle text-success' : 
+                                              type === 'error' ? 'x-circle text-danger' : 
+                                              'info-circle text-info'}"></i>
+                            <strong class="me-auto ms-2">AutoNet</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                        </div>
+                        <div class="toast-body">${message}</div>
+                    </div>
+                `;
+                
+                toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+                const toast = new bootstrap.Toast(document.getElementById(toastId));
+                toast.show();
+            }
+
+            showLoading(message = 'Loading...') {
+                document.body.classList.add('loading');
+                this.showToast(message, 'info');
+            }
+
+            hideLoading() {
+                document.body.classList.remove('loading');
+            }
+
+            apiCall(url, method = 'POST', data = {}) {
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+
+                if (method === 'POST') {
+                    headers['X-CSRFToken'] = this.getCSRFToken();
+                }
+
+                return fetch(url, {
+                    method: method,
+                    headers: headers,
+                    body: method === 'POST' ? JSON.stringify(data) : null
+                });
+            }
+
+            getCSRFToken() {
+                const token = document.querySelector('[name=csrfmiddlewaretoken]');
+                return token ? token.value : '';
+            }
+
+            bindEvents() {
+                // Auto-refresh status every 30 seconds
+                setInterval(() => {
+                    this.refreshStatus();
+                }, 30000);
+            }
+
+            refreshStatus() {
+                // This would update status indicators without full page reload
+                console.log('Refreshing status...');
+            }
+        }
+
+        // Global functions for quick actions
+        function generateConfigs() {
+            const autonet = new AutoNetUI();
+            autonet.showLoading('Generating configurations...');
+            
+            autonet.apiCall('{% url "dashboard:generate_configs" %}')
+                .then(response => response.json())
+                .then(data => {
+                    autonet.hideLoading();
+                    if (data.success) {
+                        autonet.showToast('Configurations generated successfully', 'success');
+                        setTimeout(() => location.reload(), 2000);
+                    } else {
+                        autonet.showToast('Generation failed: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    autonet.hideLoading();
+                    autonet.showToast('Network error occurred', 'error');
+                });
+        }
+
+        function deployAll() {
+            if (!confirm('Deploy configurations to all routers? This may take several minutes.')) {
+                return;
+            }
+            
+            const autonet = new AutoNetUI();
+            autonet.showLoading('Deploying to all routers...');
+            
+            autonet.apiCall('{% url "dashboard:deploy_all" %}')
+                .then(response => response.json())
+                .then(data => {
+                    autonet.hideLoading();
+                    if (data.success) {
+                        autonet.showToast(`Deployment completed: ${data.summary}`, 'success');
+                        setTimeout(() => location.reload(), 2000);
+                    } else {
+                        autonet.showToast('Deployment failed: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    autonet.hideLoading();
+                    autonet.showToast('Network error occurred', 'error');
+                });
+        }
+
+        function validateConfigs() {
+            const autonet = new AutoNetUI();
+            autonet.showLoading('Validating configurations...');
+            
+            autonet.apiCall('{% url "dashboard:validate_configs" %}')
+                .then(response => response.json())
+                .then(data => {
+                    autonet.hideLoading();
+                    if (data.success) {
+                        autonet.showToast('Configuration validation passed', 'success');
+                    } else {
+                        autonet.showToast('Validation failed: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    autonet.hideLoading();
+                    autonet.showToast('Network error occurred', 'error');
+                });
+        }
+
+        function syncRouters() {
+            const autonet = new AutoNetUI();
+            autonet.showLoading('Synchronizing routers...');
+            
+            autonet.apiCall('{% url "dashboard:sync_routers" %}')
+                .then(response => response.json())
+                .then(data => {
+                    autonet.hideLoading();
+                    if (data.success) {
+                        autonet.showToast(`Synchronized ${data.count} routers`, 'success');
+                        setTimeout(() => location.reload(), 2000);
+                    } else {
+                        autonet.showToast('Sync failed: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    autonet.hideLoading();
+                    autonet.showToast('Network error occurred', 'error');
+                });
+        }
+
+        // Initialize AutoNet UI
+        document.addEventListener('DOMContentLoaded', function() {
+            window.autonet = new AutoNetUI();
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
