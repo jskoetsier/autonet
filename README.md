@@ -1,12 +1,20 @@
-# AutoNet - Network Automation Toolchain v2.0
+# AutoNet - Network Automation Toolchain v2.1
 
 > **Attribution**: Originally created by Coloclue (KEES), completely rewritten and modernized with enterprise-grade architecture v2.0
 
-AutoNet is a production-ready network automation toolchain for generating BIRD router configurations with dynamic peering support, IRR filtering, and RPKI validation. This version represents a complete rewrite with modern Python architecture, comprehensive security features, and enterprise-grade reliability.
+AutoNet is a production-ready network automation toolchain for generating BIRD router configurations with dynamic peering support, IRR filtering, and RPKI validation. This version represents a complete rewrite with modern Python architecture, comprehensive security features, enterprise-grade reliability, and now includes a modern web-based management interface.
 
-## 🚀 What's New in v2.0
+## 🚀 What's New in v2.1
 
-### Complete Python Rewrite
+### 🌐 NEW: Web Management Interface (v2.1)
+- **Modern Django Web UI**: Professional web-based management interface
+- **Real-time Dashboard**: System status, performance charts, quick actions
+- **Router Management**: Visual router status, deployment controls, configuration history
+- **Event Monitoring**: Real-time event log with filtering and analytics
+- **Responsive Design**: Mobile-friendly Bootstrap interface with AJAX updates
+- **Full CLI Integration**: Complete backend integration with existing AutoNet tools
+
+### Complete Python Rewrite (v2.0)
 - **All bash scripts replaced** with modern Python implementations
 - **Unified CLI interface** through `autonet.py` command
 - **Enterprise architecture** with proper separation of concerns
@@ -63,6 +71,24 @@ export AUTONET_ENCRYPTION_KEY="your-encryption-key"
 # View system status and events
 ./autonet.py state events --limit 50
 ./autonet.py state stats --days 7
+```
+
+### 🌐 Web Management Interface (NEW in v2.1)
+
+```bash
+# Start the web interface
+cd webui
+pip install django pyyaml
+python manage.py migrate
+python manage.py runserver
+
+# Access at http://localhost:8000
+# Features:
+# - Real-time dashboard with system status
+# - Router management and deployment controls
+# - Configuration generation interface
+# - Event monitoring and analytics
+# - Mobile-responsive Bootstrap UI
 ```
 
 ### Legacy Compatibility

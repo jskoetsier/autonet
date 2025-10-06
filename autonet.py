@@ -339,7 +339,7 @@ def cmd_config(args):
 def main():
     """Main CLI interface"""
     parser = argparse.ArgumentParser(
-        description="AutoNet - Network Automation Toolchain v2.0",
+        description="AutoNet - Network Automation Toolchain v2.1",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 AutoNet Commands:
