@@ -1,4 +1,10 @@
-# AutoNet - Network Automation Toolchain v2.2
+# AutoNet - Network Automation Toolchain v2.3
+
+[![CI](https://github.com/jskoetsier/autonet/workflows/CI/badge.svg)](https://github.com/jskoetsier/autonet/actions/workflows/ci.yml)
+[![Security](https://github.com/jskoetsier/autonet/workflows/Security/badge.svg)](https://github.com/jskoetsier/autonet/actions/workflows/security.yml)
+[![codecov](https://codecov.io/gh/jskoetsier/autonet/branch/main/graph/badge.svg)](https://codecov.io/gh/jskoetsier/autonet)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **Attribution**: Originally created by Coloclue (KEES), completely rewritten and modernized with enterprise-grade architecture v2.0
 
