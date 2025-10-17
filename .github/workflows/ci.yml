@@ -197,6 +197,7 @@ jobs:
       env:
         DJANGO_SECRET_KEY: test-secret-key-for-ci
         DJANGO_DEBUG: False
+        DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
 
     - name: Run migrations check
       run: |
