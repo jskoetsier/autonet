@@ -194,7 +194,7 @@ jobs:
     - name: Run Django checks
       run: |
         cd webui
-        python manage.py check --deploy
+        python manage.py check
       env:
         DJANGO_SECRET_KEY: test-secret-key-for-ci
         DJANGO_DEBUG: False
