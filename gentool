@@ -38,7 +38,11 @@ def render(tpl_path, context):
     try:
         path, filename = os.path.split(tpl_path)
 
-        env = Environment(loader=FileSystemLoader(path or "./"))
+        # Network config templates don't need HTML escaping (not user-facing web content)
+        env = Environment(
+            loader=FileSystemLoader(path or "./"),
+            autoescape=False,  # nosec - Network configs, not web templates
+        )
         env.tests["regex"] = is_regex_match
 
         template = env.get_template(filename)

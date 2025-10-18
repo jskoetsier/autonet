@@ -281,10 +281,12 @@ class PeerConfigGenerator:
             from jinja2 import Environment, FileSystemLoader
 
             # Set up Jinja2 environment
+            # Network config templates don't need HTML escaping (not user-facing web content)
             env = Environment(
                 loader=FileSystemLoader(str(self.template_dir)),
                 trim_blocks=True,
                 lstrip_blocks=True,
+                autoescape=False,  # nosec - Network configs, not web templates
             )
 
             # Load template
