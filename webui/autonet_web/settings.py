@@ -111,9 +111,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+
+# Only add STATICFILES_DIRS if the directory exists
+if (BASE_DIR / "static").exists():
+    STATICFILES_DIRS = [
+        BASE_DIR / "static",
+    ]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

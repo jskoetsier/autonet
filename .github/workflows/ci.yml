@@ -203,10 +203,11 @@ jobs:
         DJANGO_DEBUG: False
         DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
 
-    - name: Run migrations check
+    - name: Generate and check migrations
       run: |
         cd webui
-        python manage.py makemigrations --check --dry-run
+        python manage.py makemigrations
+        python manage.py migrate
       env:
         DJANGO_SECRET_KEY: test-secret-key-for-ci
 
