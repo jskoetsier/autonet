@@ -18,14 +18,10 @@ from datetime import datetime
 import logging
 
 # Import AutoNet exception classes
+from lib.exceptions import ConfigurationError, ValidationError
+
+# Import API key functions from peering_filters (avoid circular import at module level)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from peering_filters import (
-    ConfigurationError,
-    ValidationError,
-    get_api_key,
-    encrypt_api_key,
-    decrypt_api_key
-)
 
 logger = logging.getLogger(__name__)
 
@@ -219,8 +215,9 @@ class ConfigurationManager:
         """Process API keys with secure handling"""
         if 'pdb_apikey' in config:
             try:
-                # Use the secure API key retrieval system
-                config['pdb_apikey'] = get_api_key("PEERINGDB", "pdb_apikey")
+                # Use the secure API key retrieval system (lazy import to avoid circular dependency)
+                import peering_filters
+                config['pdb_apikey'] = peering_filters.get_api_key("PEERINGDB", "pdb_apikey")
                 logger.info("Processed PeeringDB API key securely")
             except Exception as e:
                 logger.warning(f"Failed to process PeeringDB API key: {e}")

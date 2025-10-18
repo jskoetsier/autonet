@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 # Import AutoNet modules
-from lib.config_manager import ConfigurationError, get_config_manager
+from lib.exceptions import ConfigurationError
+from lib.config_manager import get_config_manager
 from lib.plugin_system import initialize_plugin_system
 from lib.state_manager import get_state_manager
 
