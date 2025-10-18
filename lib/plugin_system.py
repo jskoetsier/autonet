@@ -17,8 +17,7 @@ from enum import Enum
 import logging
 
 # Import AutoNet exception classes
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from peering_filters import ConfigurationError
+from lib.exceptions import ConfigurationError, PluginError
 
 logger = logging.getLogger(__name__)
 
