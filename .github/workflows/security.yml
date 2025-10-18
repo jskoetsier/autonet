@@ -14,6 +14,8 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
+    # Note: CodeQL requires GitHub Advanced Security (not available on all repos)
+    continue-on-error: true
     permissions:
       actions: read
       contents: read
@@ -32,12 +34,15 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
+      continue-on-error: true
 
     - name: Autobuild
       uses: github/codeql-action/autobuild@v3
+      continue-on-error: true
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
+      continue-on-error: true
 
   dependency-check:
     name: Dependency Vulnerability Scan
@@ -155,14 +160,24 @@ jobs:
       with:
         scan-type: 'fs'
         scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
+        format: 'table'
+      continue-on-error: true
 
-    - name: Upload Trivy results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v3
+    - name: Run Trivy and save results
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'json'
+        output: 'trivy-results.json'
+      continue-on-error: true
+
+    - name: Upload Trivy results as artifact
+      uses: actions/upload-artifact@v4
       if: always()
       with:
-        sarif_file: 'trivy-results.sarif'
+        name: trivy-report
+        path: trivy-results.json
 
   audit-summary:
     name: Security Audit Summary
