@@ -1,7 +1,7 @@
 # AutoNet - Network Automation Toolchain v2.3
 
-[![CI](https://github.com/jskoetsier/autonet/workflows/CI/badge.svg)](https://github.com/jskoetsier/autonet/actions/workflows/ci.yml)
-[![Security](https://github.com/jskoetsier/autonet/workflows/Security/badge.svg)](https://github.com/jskoetsier/autonet/actions/workflows/security.yml)
+[![CI](https://github.com/jskoetsier/autonet/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jskoetsier/autonet/actions/workflows/ci.yml)
+[![Security](https://github.com/jskoetsier/autonet/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/jskoetsier/autonet/actions/workflows/security.yml)
 [![codecov](https://codecov.io/gh/jskoetsier/autonet/branch/main/graph/badge.svg)](https://codecov.io/gh/jskoetsier/autonet)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
