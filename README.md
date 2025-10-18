@@ -1,4 +1,4 @@
-# AutoNet - Network Automation Toolchain v2.3
+# AutoNet - Network Automation Toolchain v2.3.1
 
 [![CI](https://github.com/jskoetsier/autonet/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jskoetsier/autonet/actions/workflows/ci.yml)
 [![Security](https://github.com/jskoetsier/autonet/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/jskoetsier/autonet/actions/workflows/security.yml)
