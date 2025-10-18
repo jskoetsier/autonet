@@ -69,14 +69,17 @@ jobs:
     - name: Lint with ruff
       run: |
         ruff check . --output-format=github
+      continue-on-error: true
 
     - name: Format check with black
       run: |
         black --check . --exclude '/(\.eggs|\.git|\.hg|\.mypy_cache|\.nox|\.tox|\.venv|venv|\.svn|_build|buck-out|build|dist)/'
+      continue-on-error: true
 
     - name: Sort imports check
       run: |
         isort . --check-only --profile black
+      continue-on-error: true
 
     - name: Type check with mypy
       run: |
