@@ -40,10 +40,12 @@ class Bird2VendorPlugin(VendorPlugin):
 
         # Initialize Jinja2 environment
         if Path(self.template_dir).exists():
+            # Network config templates don't need HTML escaping (not user-facing web content)
             self.jinja_env = Environment(
                 loader=FileSystemLoader(self.template_dir),
                 trim_blocks=True,
                 lstrip_blocks=True,
+                autoescape=False,  # nosec B701 - Network configs, not web templates
             )
         else:
             self.logger.warning(f"Template directory not found: {self.template_dir}")

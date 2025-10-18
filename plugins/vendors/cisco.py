@@ -53,7 +53,11 @@ class CiscoVendorPlugin(VendorPlugin):
         ]
 
         # Initialize Jinja2 environment with built-in templates
-        self.jinja_env = Environment(loader=DictLoader(self._get_builtin_templates()))
+        # Network config templates don't need HTML escaping (not user-facing web content)
+        self.jinja_env = Environment(
+            loader=DictLoader(self._get_builtin_templates()),
+            autoescape=False,  # nosec B701 - Network configs, not web templates
+        )
 
         logger.info(f"Cisco plugin initialized for platform: {self.platform}")
 
